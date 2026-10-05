@@ -23,12 +23,13 @@ type Task struct {
 	ClaimExpires int64
 	CreatedAt    int64
 	UpdatedAt    int64
+	References   []string
 }
 
 func (t Task) Claimed() bool { return t.ClaimHarness != "" }
 
 const taskColumns = `id, title, COALESCE(goal, ''), COALESCE(description, ''),
-	COALESCE(acceptance, ''), status, COALESCE(triage, ''),
+	COALESCE(acceptance, ''), COALESCE(doc_refs, ''), status, COALESCE(triage, ''),
 	priority, COALESCE(claim_harness, ''), COALESCE(claim_session, ''),
 	COALESCE(claim_expires, 0), created_at, updated_at`
 
@@ -42,11 +43,13 @@ func Load(handle *sql.DB) ([]Task, error) {
 	var tasks []Task
 	for rows.Next() {
 		var t Task
+		var references string
 		if err := rows.Scan(&t.ID, &t.Title, &t.Goal, &t.Description, &t.Acceptance,
-			&t.Status, &t.Triage, &t.Priority, &t.ClaimHarness, &t.ClaimSession,
+			&references, &t.Status, &t.Triage, &t.Priority, &t.ClaimHarness, &t.ClaimSession,
 			&t.ClaimExpires, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
+		t.References = decodeReferences(references)
 		tasks = append(tasks, t)
 	}
 	if err := rows.Err(); err != nil {

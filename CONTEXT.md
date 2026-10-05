@@ -12,6 +12,13 @@ learns outlives the session that learned it.
 A single unit of tracked work. Carries a title, and may carry a longer description.
 _Avoid_: issue, ticket, card, item, bug
 
+**References**:
+The documents a task points at — repository-relative paths, each optionally carrying an
+anchor. The reasoning behind a task belongs in the document that holds it; the task names it
+rather than copying it. Seraph does not hold these documents: they stay in the repository,
+where git can review them.
+_Avoid_: attachments, links, resources
+
 **Board**:
 Every task belonging to one repository, considered as a whole.
 _Avoid_: kanban, project, backlog, list

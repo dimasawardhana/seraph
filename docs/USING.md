@@ -475,6 +475,35 @@ at?" on a board with agents on it.
 
 A task with no triage is simply not triaged yet. That is normal.
 
+### References
+
+Every task can name the documents that explain it. They go on `create_task` and
+`update_task` as a list of repository-relative paths, each optionally carrying an anchor:
+
+```json
+{"task_id": "TASK-119", "references": ["CONTEXT.md#index", "docs/adr/0001-rendered-view-is-the-product.md"]}
+```
+
+They render under the task in `KANBAN.md`, and they are carried in `board.json` so a clone
+gets them back with the board.
+
+**Seraph does not hold these documents.** They stay in the repository, where git can review
+them — putting them in the database would make every one of them machine-local, and they
+would be gone from the next clone.
+
+Two things follow from that, and both are deliberate:
+
+- A reference must be relative to the repository root and must not climb out of it. An
+  absolute path means one thing to whoever wrote it and nothing to anyone else, so it is
+  refused with `INVALID_REFERENCE` rather than stored.
+- **A reference whose file is missing is reported by `seraph doctor`, not written into
+  `KANBAN.md`.** That file is a pure function of the database — the same board must render
+  identically on every machine — so anything that reads the filesystem stays out of it.
+
+This is not the Index. `prd.md` §13 designs a searchable projection of a project's prose;
+that is a larger thing, still deferred. A reference is a path today and can resolve to an
+index entry later without this shape changing.
+
 ## Configuration
 
 ```bash

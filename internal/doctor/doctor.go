@@ -14,6 +14,7 @@ import (
 	"seraph/internal/board"
 	"seraph/internal/db"
 	"seraph/internal/repo"
+	"sort"
 )
 
 func Run(_ context.Context, w io.Writer) error {
@@ -74,6 +75,17 @@ func Run(_ context.Context, w io.Writer) error {
 		field(w, name, snapshotState(handle, root, name))
 	}
 
+	// A reference that points at a file nobody has is the same shape as a hook file that
+	// nothing reads: it looks like coverage. It is reported here rather than in KANBAN.md
+	// because that file must stay a pure function of the database — a check that reads the
+	// filesystem would make every clone's board differ from the one it was committed with.
+	missing := missingReferences(handle, root)
+	if len(missing) > 0 {
+		for _, ref := range missing {
+			field(w, "references", ref)
+		}
+	}
+
 	reportHarnesses(w, root)
 
 	if applied != db.SchemaVersion {
@@ -108,6 +120,35 @@ func snapshotState(handle *sql.DB, r repo.Root, name string) string {
 	}
 	return fmt.Sprintf("%d bytes, %s ago, DIFFERS from the board — any tool call rewrites it",
 		len(onDisk), age)
+}
+
+// missingReferences names every reference on the board whose file is not there.
+//
+// The anchor is stripped before the check: `docs/x.md#section` is about a file, and
+// whether that file happens to carry the named heading is a different question this does
+// not answer. Claiming to check it would be the same defect one level in.
+func missingReferences(handle *sql.DB, root repo.Root) []string {
+	tasks, err := board.Load(handle)
+	if err != nil {
+		return nil
+	}
+	var missing []string
+	seen := map[string]bool{}
+	for _, t := range tasks {
+		for _, ref := range t.References {
+			path := filepath.Join(root.Path, filepath.FromSlash(board.ReferencePath(ref)))
+			if _, err := os.Stat(path); err == nil {
+				continue
+			}
+			line := fmt.Sprintf("%s → %s is missing", t.ID, board.ReferencePath(ref))
+			if !seen[line] {
+				seen[line] = true
+				missing = append(missing, line)
+			}
+		}
+	}
+	sort.Strings(missing)
+	return missing
 }
 
 func onDiskModTime(path string) time.Time {

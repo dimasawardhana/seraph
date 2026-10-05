@@ -17,6 +17,7 @@ const (
 	ReasonInvalidStatus     = "INVALID_STATUS"
 	ReasonInvalidTriage     = "INVALID_TRIAGE"
 	ReasonInvalidPriority   = "INVALID_PRIORITY"
+	ReasonInvalidReference  = "INVALID_REFERENCE"
 )
 
 type Holder struct {

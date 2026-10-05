@@ -35,6 +35,13 @@ func (s Snapshot) Markdown() []byte {
 	return buf.Bytes()
 }
 
+// writeTask renders one task.
+//
+// Everything here is a pure function of the Task. Nothing reads the filesystem, and that is
+// load-bearing rather than incidental: the rendered board must be byte-identical on every
+// machine holding the same database, or a clone would report its snapshots as differing from
+// a board it had never touched. That is also why a reference whose file is missing is
+// reported by `seraph doctor` and never here.
 func writeTask(buf *bytes.Buffer, t Task) {
 	fmt.Fprintf(buf, "### %s · %s\n\n", t.ID, oneLine(t.Title))
 	if t.Goal != "" {
@@ -54,6 +61,13 @@ func writeTask(buf *bytes.Buffer, t Task) {
 			oneLine(t.ClaimHarness), t.ClaimSession, stamp(t.ClaimExpires))
 	}
 	fmt.Fprintf(buf, "- updated: %s\n", stamp(t.UpdatedAt))
+
+	if len(t.References) > 0 {
+		fmt.Fprintf(buf, "references:\n")
+		for _, ref := range t.References {
+			fmt.Fprintf(buf, "  - %s\n", oneLine(ref))
+		}
+	}
 
 	if t.Acceptance != "" {
 		buf.WriteString("\n")
@@ -77,7 +91,8 @@ func writeTask(buf *bytes.Buffer, t Task) {
 func splitLines(s string) []string {
 	var lines []string
 	for _, line := range bytes.Split([]byte(s), []byte("\n")) {
-		lines = append(lines, string(bytes.TrimRight(line, "\r")))
+		line = bytes.TrimRight(line, "\r")
+		lines = append(lines, string(line))
 	}
 	return lines
 }
@@ -95,6 +110,7 @@ type taskJSON struct {
 	Status      string     `json:"status"`
 	Triage      string     `json:"triage,omitempty"`
 	Priority    string     `json:"priority"`
+	References  []string   `json:"references,omitempty"`
 	Claim       *claimJSON `json:"claim"`
 	CreatedAt   string     `json:"created_at"`
 	UpdatedAt   string     `json:"updated_at"`
@@ -135,6 +151,7 @@ func taskToJSON(t Task) taskJSON {
 		Status:      t.Status,
 		Triage:      t.Triage,
 		Priority:    t.Priority,
+		References:  t.References,
 		CreatedAt:   stamp(t.CreatedAt),
 		UpdatedAt:   stamp(t.UpdatedAt),
 	}

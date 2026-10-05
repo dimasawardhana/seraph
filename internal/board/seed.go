@@ -92,10 +92,10 @@ func SeedFromSnapshot(handle *sql.DB, r repo.Root) (int, error) {
 		// snapshot from a future version must not half-apply.
 		if _, err := tx.Exec(
 			`INSERT INTO tasks (id, title, goal, description, acceptance, status, triage,
-			                    priority, claim_harness, claim_session, claim_expires, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			t.ID, t.Title, t.Goal, t.Description, t.Acceptance, t.Status, triage,
-			t.Priority, harness, session, expires, created, updated); err != nil {
+			                    priority, doc_refs, claim_harness, claim_session, claim_expires, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			t.ID, t.Title, t.Goal, t.Description, t.Acceptance, t.Status, triage, t.Priority,
+			encodeReferences(t.References), harness, session, expires, created, updated); err != nil {
 			return 0, fmt.Errorf("seed %s: %w", t.ID, err)
 		}
 

@@ -28,6 +28,7 @@ type CreateParams struct {
 	Acceptance  string
 	Priority    string
 	Triage      string
+	References  []string
 }
 
 type ClaimParams struct {
@@ -46,6 +47,7 @@ type UpdateParams struct {
 	Acceptance  *string
 	Priority    *string
 	Triage      *string
+	References  *[]string
 }
 
 type ReleaseParams struct {
@@ -157,6 +159,11 @@ func Create(handle *sql.DB, r repo.Root, in CreateParams) (Snapshot, []byte, err
 		return Snapshot{}, nil, err
 	}
 
+	references, err := NormalizeReferences(in.References)
+	if err != nil {
+		return Snapshot{}, nil, err
+	}
+
 	priority := in.Priority
 	if priority == "" {
 		priority = vocab.Default(vocab.Priorities)
@@ -170,10 +177,11 @@ func Create(handle *sql.DB, r repo.Root, in CreateParams) (Snapshot, []byte, err
 
 		now := time.Now().UTC().Unix()
 		_, err := tx.Exec(`INSERT INTO tasks
-		                   (id, title, goal, description, acceptance, status, priority, triage, created_at, updated_at)
-		                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		                   (id, title, goal, description, acceptance, status, priority, triage, doc_refs, created_at, updated_at)
+		                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			fmt.Sprintf("TASK-%d", n), title, goal, in.Description, acceptance,
-			vocab.Default(vocab.Statuses), priority, nullString(in.Triage), now, now)
+			vocab.Default(vocab.Statuses), priority, nullString(in.Triage),
+			encodeReferences(references), now, now)
 		if err != nil {
 			return fmt.Errorf("insert task: %w", err)
 		}
@@ -298,6 +306,13 @@ func UpdateTask(handle *sql.DB, r repo.Root, in UpdateParams) (Snapshot, []byte,
 		}
 		if in.Triage != nil {
 			add("triage", nullString(*in.Triage))
+		}
+		if in.References != nil {
+			normalized, err := NormalizeReferences(*in.References)
+			if err != nil {
+				return err
+			}
+			add("doc_refs", encodeReferences(normalized))
 		}
 
 		switch {

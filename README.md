@@ -27,6 +27,19 @@ priority, and triage saying who could pick it up. Claims expire on their own (30
 by default, `SERAPH_CLAIM_TTL` to change it), so an agent that dies mid-task does not hold it
 forever.
 
+### Pointing a task at its paperwork
+
+A task can name the documents that explain it — repository-relative paths, each optionally
+with an anchor, on `create_task` or `update_task`:
+
+```json
+{"task_id": "TASK-119", "references": ["CONTEXT.md#index", "docs/adr/0001-rendered-view-is-the-product.md"]}
+```
+
+The documents stay in the repository, where git reviews them; Seraph only points at them.
+`seraph doctor` reports any reference whose file is not there — a reference pointing at
+nothing looks exactly like coverage, and this project has been bitten by that twice.
+
 ## The claim gate
 
 A harness that can run a pre-tool hook can also have its writes *refused* when the session

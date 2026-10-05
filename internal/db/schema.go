@@ -7,9 +7,9 @@ import (
 	"seraph/internal/vocab"
 )
 
-// SchemaVersion is the version this build expects. Raise it whenever statements change,
-// and append the new ones to upgrade; never edit a released one.
-const SchemaVersion = 2
+// SchemaVersion is the version this build expects. Raise it whenever statements change, and
+// add a new entry to migrations below; never edit a released one.
+const SchemaVersion = 3
 
 // createTasks is the v1 shape plus every column added since, so a brand-new database is
 // correct in one pass and never has to be altered.
@@ -38,6 +38,10 @@ var createTasks = []string{
 		priority      TEXT    NOT NULL DEFAULT '` + vocab.Default(vocab.Priorities) + `'
 		              CHECK (priority IN (` + vocab.Quoted(vocab.Priorities) + `)),
 		claim_harness TEXT,
+		-- Named doc_refs, not references: REFERENCES is a SQLite keyword, so the natural
+		-- column name has to be quoted in every statement that touches it. The domain
+		-- word stays "references" everywhere a human reads it.
+		doc_refs    TEXT,
 		claim_session TEXT,
 		claim_expires INTEGER,
 		metadata      TEXT,
@@ -51,16 +55,25 @@ var createTasks = []string{
 	`INSERT OR IGNORE INTO id_sequence (id, last) VALUES (1, 100)`,
 }
 
-// upgrade holds statements that apply only to a database already carrying the v1 shape.
-// A fresh database gets everything from createTasks, and running these against it fails
-// with "duplicate column name" — which is how that was found.
-var upgrade = []string{
-	`ALTER TABLE tasks ADD COLUMN goal TEXT`,
-	`ALTER TABLE tasks ADD COLUMN acceptance TEXT`,
-	// v1 rows have no goal, and acceptance criteria did not exist then. Backfill rather
-	// than fail: the history is worth keeping, and the Rules tell an agent to fill these
-	// in when it next touches the task.
-	`UPDATE tasks SET goal = title WHERE goal IS NULL OR goal = ''`,
+// migrations maps a schema version to the statements that take a database from it to the
+// next, and Migrate runs every entry above the version actually recorded.
+//
+// One shared "upgrade" list could not survive a second version: raising SchemaVersion would
+// have re-run the v1-to-v2 ALTERs against a board that already had those columns, and every
+// existing repository would have failed to open. Keying by version is what makes adding a
+// column an ordinary change instead of a trap.
+var migrations = map[int][]string{
+	1: {
+		`ALTER TABLE tasks ADD COLUMN goal TEXT`,
+		`ALTER TABLE tasks ADD COLUMN acceptance TEXT`,
+		// v1 rows have no goal, and acceptance criteria did not exist then. Backfill rather
+		// than fail: the history is worth keeping, and the Rules tell an agent to fill these
+		// in when it next touches the task.
+		`UPDATE tasks SET goal = title WHERE goal IS NULL OR goal = ''`,
+	},
+	2: {
+		`ALTER TABLE tasks ADD COLUMN doc_refs TEXT`,
+	},
 }
 
 func Migrate(handle *sql.DB) error {
@@ -80,7 +93,10 @@ func Migrate(handle *sql.DB) error {
 
 	statements := createTasks
 	if current >= 1 {
-		statements = upgrade
+		statements = nil
+		for version := current; version < SchemaVersion; version++ {
+			statements = append(statements, migrations[version]...)
+		}
 	}
 	for i, statement := range statements {
 		if _, err := tx.Exec(statement); err != nil {

@@ -16,12 +16,13 @@ import (
 type noInputs struct{}
 
 type createArgs struct {
-	Title       string `json:"title"`
-	Goal        string `json:"goal"`
-	Acceptance  string `json:"acceptance"`
-	Description string `json:"description,omitempty"`
-	Priority    string `json:"priority,omitempty"`
-	Triage      string `json:"triage,omitempty"`
+	Title       string   `json:"title"`
+	Goal        string   `json:"goal"`
+	Acceptance  string   `json:"acceptance"`
+	Description string   `json:"description,omitempty"`
+	Priority    string   `json:"priority,omitempty"`
+	Triage      string   `json:"triage,omitempty"`
+	References  []string `json:"references,omitempty"`
 }
 
 type claimArgs struct {
@@ -35,15 +36,16 @@ type getTaskArgs struct {
 }
 
 type updateArgs struct {
-	TaskID      string  `json:"task_id"`
-	SessionID   string  `json:"session_id"`
-	Status      *string `json:"status,omitempty"`
-	Title       *string `json:"title,omitempty"`
-	Goal        *string `json:"goal,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Acceptance  *string `json:"acceptance,omitempty"`
-	Priority    *string `json:"priority,omitempty"`
-	Triage      *string `json:"triage,omitempty"`
+	TaskID      string    `json:"task_id"`
+	SessionID   string    `json:"session_id"`
+	Status      *string   `json:"status,omitempty"`
+	Title       *string   `json:"title,omitempty"`
+	Goal        *string   `json:"goal,omitempty"`
+	Description *string   `json:"description,omitempty"`
+	Acceptance  *string   `json:"acceptance,omitempty"`
+	Priority    *string   `json:"priority,omitempty"`
+	Triage      *string   `json:"triage,omitempty"`
+	References  *[]string `json:"references,omitempty"`
 }
 
 type releaseArgs struct {
@@ -127,6 +129,7 @@ func createTask(handle *sql.DB, r repo.Root) func(context.Context, *mcp.CallTool
 			Acceptance:  args.Acceptance,
 			Priority:    args.Priority,
 			Triage:      args.Triage,
+			References:  args.References,
 		})
 		return respond(markdown, err)
 	}
@@ -169,6 +172,7 @@ func updateTask(handle *sql.DB, r repo.Root) func(context.Context, *mcp.CallTool
 			Acceptance:  args.Acceptance,
 			Priority:    args.Priority,
 			Triage:      args.Triage,
+			References:  args.References,
 		})
 		return respond(markdown, err)
 	}
