@@ -1,3 +1,43 @@
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Code coverage profiles and other test artifacts
+*.out
+coverage.*
+!coverage.go
+*.coverprofile
+profile.cov
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# env file
+.env
+
+# Editor/IDE
+# .idea/
+# .vscode/
+
+# ── Seraph ──────────────────────────────────────────────────────
+
+# The compiled binary. `go build` in the repository root writes ./seraph, which is the same
+# name as the module and would sit beside go.mod looking like source.
+/seraph
+
 # Harness hook files, written by `seraph install`.
 #
 # They embed the absolute path of the binary that wrote them — `/home/<you>/go/bin/seraph`
@@ -7,22 +47,15 @@
 # committed. This also matches the project's own rule, from prd.md §10: `.mcp.json` is
 # committed with a bare `seraph` command precisely because an absolute path breaks on every
 # other machine.
-.claude/settings.json
-.cursor/hooks.json
+#
 # `.kiro/hooks/` and `.omp/hooks/` are leftovers from before TASK-114: Kiro cannot enforce
 # and is reported advisory, and omp's gate moved to ~/.omp/agent/hooks/, the only directory
 # omp discovers. They are ignored rather than deleted because removing a file from someone's
 # machine is not this repository's call.
+.claude/settings.json
+.cursor/hooks.json
 .kiro/hooks/
 .omp/hooks/
-
-# The compiled binary. `go build` in the repository root writes ./seraph, which is the same
-# name as the module and would sit beside go.mod looking like source.
-/seraph
-
-# Coverage and profiling output, if anyone reaches for them.
-/coverage.out
-*.test
 
 # Local tooling configuration, not part of the product.
 .impeccable/
