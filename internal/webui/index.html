@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seraph · board</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+  <div class="mark">SERAPH</div>
+  <div class="where" title="{{.Root}}">{{.Root}}</div>
+  <div class="stats">
+    <span class="stat"><b>{{.View.Total}}</b> task{{if ne .View.Total 1}}s{{end}}</span>
+    <span class="stat"><b>{{held .View}}</b> yours</span>
+  </div>
+  <div class="pulse" id="pulse" data-state="live" title="refreshes itself every 1.5s"><i></i>live</div>
+</header>
+
+{{if .Note}}<div class="banner note">{{.Note}}</div>{{end}}
+{{if .Err}}<div class="banner error">{{.Err}}</div>{{end}}
+
+<form class="compose" method="post" action="/act?t={{.Token}}">
+  <input type="hidden" name="action" value="create">
+  <div class="compose-row">
+    <input class="grow" name="title" id="new-title" placeholder="title" required autocomplete="off">
+    <input class="grow" name="goal" placeholder="goal — what changes, for whom" required autocomplete="off">
+    <input class="grow" name="acceptance" placeholder="done when — how anyone can tell" required autocomplete="off">
+    <select name="priority" aria-label="priority" title="priority">
+      {{range .Priorities}}<option value="{{.Value}}"{{if .Default}} selected{{end}}>{{.Value}}</option>{{end}}
+    </select>
+    <select name="triage" aria-label="triage" title="triage">
+      <option value="">triage —</option>
+      {{range .Triages}}<option value="{{.Value}}">{{.Value}}</option>{{end}}
+    </select>
+    <button type="submit">add</button>
+  </div>
+  <p class="compose-hint">Every task states what it is for and how anyone can tell it was finished — the board refuses one without both.</p>
+</form>
+
+<nav class="filters">
+  <input id="filter" placeholder="filter — title, id, or holder" autocomplete="off" spellcheck="false">
+  <span class="count" id="count"></span>
+  <button type="button" class="link" id="help-toggle" aria-expanded="false">keys ?</button>
+</nav>
+
+<section class="help" id="help" hidden>
+  <dl>
+    <div><dt>j k</dt><dd>move</dd></div>
+    <div><dt>c</dt><dd>claim</dd></div>
+    <div><dt>s</dt><dd>start</dd></div>
+    <div><dt>r</dt><dd>review</dd></div>
+    <div><dt>d</dt><dd>done — releases the claim</dd></div>
+    <div><dt>u</dt><dd>release</dd></div>
+    <div><dt>n</dt><dd>new task</dd></div>
+    <div><dt>/</dt><dd>filter</dd></div>
+    <div><dt>↵</dt><dd>open</dd></div>
+    <div><dt>esc</dt><dd>clear</dd></div>
+  </dl>
+</section>
+
+<main id="board">{{template "board" .}}</main>
+
+<footer class="foot">
+  <span>the server refuses a completion from anyone but the claim holder</span>
+  <span class="key">esc clears · ? for keys</span>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
+
+{{define "board"}}
+<div class="panel" data-hash="{{hash .View}}">
+{{if not .View.Columns}}
+  <div class="empty">
+    <p><b>The board is empty.</b></p>
+    <p>Add a task above, or ask a harness to — <code>n</code> starts a new one here.</p>
+  </div>
+{{end}}
+
+{{range .View.Columns}}
+<section class="group" data-status="{{.Status}}">
+  <h2 class="plate"><span>{{.Label}}</span><b>{{len .Items}}</b></h2>
+  <div class="rows">
+  {{range .Items}}
+  <article class="row aspect-{{aspect .}}" data-task="{{.ID}}" data-pri="{{.Priority}}" data-done="{{if eq .Status "done"}}1{{else}}0{{end}}" data-t="{{.ID}} {{.Title}} {{.ClaimHolder}}" tabindex="0">
+    <span class="signal" title="priority: {{.Priority}}"></span>
+    <span class="id">{{.ID}}</span>
+    <span class="title">{{.Title}}</span>
+    {{if .Triage}}<span class="tag">{{.Triage}}</span>{{end}}
+    <span class="holder">
+      {{- if .ClaimedByMe}}<span class="you">you</span> {{ttl .ClaimExpires}}{{- else if .ClaimHolder}}<span class="them">{{.ClaimHolder}}</span> {{ttl .ClaimExpires}}{{- else}}<span class="free">clear</span>{{- end}}
+    </span>
+    <span class="acts">
+      {{if .ClaimedByMe}}
+        {{if ne .Status "in_progress"}}<form method="post" action="/act?t={{$.Token}}"><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="status" value="in_progress"><button data-k="s" title="start">start</button></form>{{end}}
+        {{if ne .Status "review"}}<form method="post" action="/act?t={{$.Token}}"><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="status" value="review"><button data-k="r" title="review">review</button></form>{{end}}
+        <form method="post" action="/act?t={{$.Token}}"><input type="hidden" name="action" value="done"><input type="hidden" name="id" value="{{.ID}}"><button data-k="d" class="done" title="done — releases the claim">done</button></form>
+        <form method="post" action="/act?t={{$.Token}}"><input type="hidden" name="action" value="release"><input type="hidden" name="id" value="{{.ID}}"><button data-k="u" title="release without completing">release</button></form>
+      {{else if .ClaimHolder}}
+        <span class="locked" aria-hidden="true"></span>
+      {{else}}
+        <form method="post" action="/act?t={{$.Token}}"><input type="hidden" name="action" value="claim"><input type="hidden" name="id" value="{{.ID}}"><button data-k="c" title="claim">claim</button></form>
+      {{end}}
+    </span>
+    <div class="detail" hidden>
+      {{if .Description}}<p>{{.Description}}</p>{{else}}<p class="none">no description</p>{{end}}
+      <dl>
+        <div><dt>status</dt><dd>{{.Status}}</dd></div>
+        <div><dt>priority</dt><dd>{{.Priority}}</dd></div>
+        {{if .Triage}}<div><dt>triage</dt><dd>{{.Triage}}</dd></div>{{end}}
+        <div><dt>updated</dt><dd>{{since .UpdatedAt}}</dd></div>
+        {{if .ClaimHolder}}<div><dt>held by</dt><dd>{{.ClaimHolder}}</dd></div>{{end}}
+      </dl>
+    </div>
+  </article>
+  {{end}}
+  </div>
+</section>
+{{end}}
+</div>
+{{end}}

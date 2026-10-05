@@ -1,0 +1,6 @@
+# Seraph local state — machine-local, not for committing.
+#
+# The rendered snapshots alongside this file are meant to be committed.
+state.db
+state.db-wal
+state.db-shm

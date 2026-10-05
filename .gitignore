@@ -1,0 +1,28 @@
+# Harness hook files, written by `seraph install`.
+#
+# They embed the absolute path of the binary that wrote them — `/home/<you>/go/bin/seraph`
+# — so a copy committed here would point at another machine's home directory and quietly do
+# nothing. That is the failure TASK-110 spent a day on, not a hypothetical one. `seraph
+# install` regenerates each of these per machine, which is why they are ignored rather than
+# committed. This also matches the project's own rule, from prd.md §10: `.mcp.json` is
+# committed with a bare `seraph` command precisely because an absolute path breaks on every
+# other machine.
+.claude/settings.json
+.cursor/hooks.json
+# `.kiro/hooks/` and `.omp/hooks/` are leftovers from before TASK-114: Kiro cannot enforce
+# and is reported advisory, and omp's gate moved to ~/.omp/agent/hooks/, the only directory
+# omp discovers. They are ignored rather than deleted because removing a file from someone's
+# machine is not this repository's call.
+.kiro/hooks/
+.omp/hooks/
+
+# The compiled binary. `go build` in the repository root writes ./seraph, which is the same
+# name as the module and would sit beside go.mod looking like source.
+/seraph
+
+# Coverage and profiling output, if anyone reaches for them.
+/coverage.out
+*.test
+
+# Local tooling configuration, not part of the product.
+.impeccable/
