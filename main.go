@@ -215,7 +215,9 @@ usage:
   seraph board               view and work the board in the terminal
   seraph ui [--port N]       view and work the board in a browser (default 7777)
   seraph install [--dry-run] register with this repository's harnesses and place the Rules
-  seraph hook [--explain] report which harnesses can enforce the claim gate
+  seraph hook [--explain | --verify]
+                         report which harnesses can enforce the claim gate; --verify checks
+                         that a recorded refusal still applies to the build installed
   seraph gate            the pre-tool hook a harness runs; not usually called by hand
   seraph doctor              report repository, database, and snapshot health
   seraph version             print the version

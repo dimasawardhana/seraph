@@ -35,6 +35,17 @@ func Run(_ context.Context, w io.Writer) error {
 		return errors.New("database unreachable")
 	}
 	defer handle.Close()
+
+	// Doctor reports the seed rather than refusing to run. A snapshot this build cannot
+	// read is worth saying out loud, but doctor exists to describe a board, and the fix
+	// is the reader's — the servers are where a bad snapshot must stop the line.
+	seeded, seedErr := board.SeedFromSnapshot(handle, root)
+	switch {
+	case seedErr != nil:
+		field(w, "board", "NOT RESTORED from "+board.SnapshotFile+" — "+seedErr.Error())
+	case seeded > 0:
+		field(w, "board", fmt.Sprintf("restored %d task(s) from the committed %s", seeded, board.SnapshotFile))
+	}
 	field(w, "database", root.DBPath())
 
 	journal, err := scalar(handle, "PRAGMA journal_mode")

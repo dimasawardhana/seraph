@@ -509,6 +509,22 @@ in `internal/version`.
 `.seraph/.gitignore` is self-contained: install writes it rather than touching your root
 `.gitignore`.
 
+**Cloning a repository that already has a board.** The database is deliberately not committed
+and the snapshots are, so a fresh clone arrives holding the whole history in two files and no
+database — and the first tool call would otherwise render an empty board over the top of it.
+Seraph restores it instead: the first command to open a board seeds an empty one from
+`board.json` and says so —
+
+```
+board restored 16 task(s) from the committed board.json
+```
+
+It seeds **only** a board holding zero tasks, so a board you have worked on is never replaced by
+an older snapshot, and a second command on the same clone reports nothing because there is
+nothing left to restore. If the snapshot contains anything this build does not understand — an
+unknown status, say — the whole seed is refused rather than half-applied, and `seraph serve`
+refuses to start rather than hand you an empty board it would then overwrite.
+
 ## Adding other harnesses
 
 v1 writes the project-scope config only. For the rest, add a server entry yourself. **The shapes

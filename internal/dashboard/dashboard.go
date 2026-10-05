@@ -35,6 +35,12 @@ func Open(root repo.Root) (*Board, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Same reasoning as the MCP server: a board restored from the committed snapshot must
+	// not be allowed to render itself empty on the first change.
+	if _, err := board.SeedFromSnapshot(handle, root); err != nil {
+		handle.Close()
+		return nil, err
+	}
 	token, err := randomID()
 	if err != nil {
 		handle.Close()
