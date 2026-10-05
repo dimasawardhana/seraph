@@ -619,10 +619,10 @@ Know these before relying on it:
 | Symptom | Cause |
 | --- | --- |
 | `marker none found` in doctor | No `.git` or `.seraph/` above your working directory |
-| Harness shows no seraph tools | `which seraph` fails, or the harness needs a restart to pick up `.mcp.json` |
+| Harness shows no seraph tools | `which seraph` fails, or the config has not been picked up. Many harnesses reload without a restart — omp takes `/mcp reload`, which re-reads `mcp.json` from disk |
 | Harness can't spawn the server | `command` must be the bare name `seraph`, not a path — and it must be on PATH |
-| Snapshot says `DIFFERS from the board` | Something edited the database or the file out of band; any tool call rewrites it |
+| Snapshot says `DIFFERS from the board` | Either something edited the database or the file out of band, or you are on a fresh clone where the database does not exist yet. `seraph doctor` tells you which: it restores an empty board from the snapshot and then reports both as current |
 | Agent says it finished but the board disagrees | Trust `get_task`; the claim state is authoritative, not what the agent said |
-| Task stuck claimed by a dead agent | Wait out the TTL, or shorten it with `SERAPH_CLAIM_TTL` |
+| Task stuck claimed by a dead agent | Wait out the TTL. Only the session that took the claim can release it — `release_task` from any other is refused — and a shorter `SERAPH_CLAIM_TTL` set afterwards changes nothing already written. Once the claim lapses, another session can claim the task |
 | `CLAIM_ALREADY_HELD` on a claim | The calling session already holds it — it should just keep working |
 | `install` refuses a `.mcp.json` | That file exists but is not valid JSON. Fix it; install will not guess |
