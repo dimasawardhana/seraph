@@ -1,27 +1,6 @@
 {
   "tasks": [
     {
-      "id": "TASK-124",
-      "title": "get_task fails on every call: its Scan drops the doc_refs column",
-      "goal": "get_task is one of the six v1 tools and it returns an error for every task id, because Get scans taskColumns into 13 destinations while the query returns 14 — doc_refs has no home — so a reader cannot fetch a single task even though the Definition of done counts this tool as shipped.",
-      "description": "Found while fetching TASK-122's detail: `get_task TASK-122` returned `read task TASK-122: sql: expected 14 destination arguments in Scan, not 13`.\n\ninternal/board/board.go:31 taskColumns selects 14 columns, with doc_refs sixth. internal/board/get.go:10-13 Scan has 13 destinations and no holder for the references string, so doc_refs is dropped. Load (board.go:44-53) does it correctly — a local `references string` scanned in the doc_refs slot, then decodeReferences into t.References. Get was not updated when TASK-119 added doc_refs to taskColumns, and no test covers get_task, so nothing caught it: mcp/tools_test.go has three tests and none calls getTask.",
-      "acceptance": "1. Get scans every column taskColumns selects, carrying doc_refs through to the task's references exactly as Load does.\n2. A test calls getTask on a real task and asserts its body comes back, not an error — the defect is pinned so it cannot return.\n3. Verified against this repository's own board, not a copy.\n4. gofmt -l, go vet ./... and go test ./... all clean.\n5. Done through the board with the claim held by the session that did the work.",
-      "status": "backlog",
-      "triage": "ready-for-agent",
-      "priority": "high",
-      "references": [
-        "internal/board/get.go",
-        "internal/board/board.go"
-      ],
-      "claim": {
-        "harness": "omp",
-        "session": "omp-20261009T1119Z-main-01a12063",
-        "expires": "2026-10-09T12:06:39Z"
-      },
-      "created_at": "2026-10-09T11:35:57Z",
-      "updated_at": "2026-10-09T11:36:39Z"
-    },
-    {
       "id": "TASK-101",
       "title": "Sync ROADMAP.md with shipped scope",
       "goal": "ROADMAP.md describes v1 as six MCP tools, but internal/ also ships webui, dashboard, tui, vocab and gate. Either the roadmap records that scope as carried forward with the reason it is not in v1, or the scope line is corrected. The roadmap must not silently disagree with the tree.",
@@ -161,6 +140,23 @@
       "claim": null,
       "created_at": "2026-10-05T06:10:30Z",
       "updated_at": "2026-10-05T06:31:40Z"
+    },
+    {
+      "id": "TASK-124",
+      "title": "get_task fails on every call: its Scan drops the doc_refs column",
+      "goal": "get_task is one of the six v1 tools and it returns an error for every task id, because Get scans taskColumns into 13 destinations while the query returns 14 — doc_refs has no home — so a reader cannot fetch a single task even though the Definition of done counts this tool as shipped.",
+      "description": "Found while fetching TASK-122's detail: `get_task TASK-122` returned `read task TASK-122: sql: expected 14 destination arguments in Scan, not 13`.\n\ninternal/board/board.go:31 taskColumns selects 14 columns, with doc_refs sixth. internal/board/get.go:10-13 Scan has 13 destinations and no holder for the references string, so doc_refs is dropped. Load (board.go:44-53) does it correctly — a local `references string` scanned in the doc_refs slot, then decodeReferences into t.References. Get was not updated when TASK-119 added doc_refs to taskColumns, and no test covers get_task, so nothing caught it: mcp/tools_test.go has three tests and none calls getTask.",
+      "acceptance": "1. Get scans every column taskColumns selects, carrying doc_refs through to the task's references exactly as Load does. [met: internal/board/get.go now declares `var references string`, scans it in the doc_refs slot, and sets t.References = decodeReferences(references) before returning — the same pattern Load uses]\n2. A test calls getTask on a real task and asserts its body comes back, not an error — the defect is pinned so it cannot return. [met: TestGetTaskReturnsTheTaskBody in internal/mcp/tools_test.go builds a real board through db.Open, sets two references, calls the real getTask, and asserts TASK-1, CONTEXT.md#index and docs/adr/0001 all appear in the body]\n3. Verified against this repository's own board, not a copy. [met: a throwaway main under the module called board.Get against /home/dimasajiwardhana/Documents/code/seraph/.seraph/state.db — TASK-122 and TASK-101 returned their titles, and TASK-124 returned refs [internal/board/get.go internal/board/board.go], so both the crash and the references round-trip are fixed. The harness was deleted afterwards; it was never committed]\n4. gofmt -l, go vet ./... and go test ./... all clean. [met: gofmt -l empty, go vet clean, go test ./... -count=1 green across board, db, doctor, gate, installer, mcp and tui]\n5. Done through the board with the claim held by the session that did the work. [met: claimed as omp, session omp-20261009T1119Z-main-01a12063; set done by that session]\n\nSTILL STALE, DELIBERATELY NOT TOUCHED. The running omp MCP server is the installed binary at ~/go/bin/seraph, which predates this fix, so get_task still fails through the live tool until that binary is rebuilt and reinstalled. Rebuilding into ~/go/bin is outside the 'record + commit locally' scope the owner set, so it was left for a decision rather than done silently. The fix landed in commit 61bc363.",
+      "status": "done",
+      "triage": "ready-for-agent",
+      "priority": "high",
+      "references": [
+        "internal/board/get.go",
+        "internal/board/board.go"
+      ],
+      "claim": null,
+      "created_at": "2026-10-09T11:35:57Z",
+      "updated_at": "2026-10-09T11:38:31Z"
     },
     {
       "id": "TASK-105",

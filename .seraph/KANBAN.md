@@ -2,29 +2,6 @@
 
 _Written by Seraph. Do not edit — this file is replaced on every change._
 
-## Backlog
-
-### TASK-124 · get_task fails on every call: its Scan drops the doc_refs column
-
-> **Goal:** get_task is one of the six v1 tools and it returns an error for every task id, because Get scans taskColumns into 13 destinations while the query returns 14 — doc_refs has no home — so a reader cannot fetch a single task even though the Definition of done counts this tool as shipped.
-- priority: high
-- triage: ready-for-agent
-- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T12:06:39Z)
-- updated: 2026-10-09T11:36:39Z
-references:
-  - internal/board/get.go
-  - internal/board/board.go
-
-> **Done when:** 1. Get scans every column taskColumns selects, carrying doc_refs through to the task's references exactly as Load does.
-> **Done when:** 2. A test calls getTask on a real task and asserts its body comes back, not an error — the defect is pinned so it cannot return.
-> **Done when:** 3. Verified against this repository's own board, not a copy.
-> **Done when:** 4. gofmt -l, go vet ./... and go test ./... all clean.
-> **Done when:** 5. Done through the board with the claim held by the session that did the work.
-
-> Found while fetching TASK-122's detail: `get_task TASK-122` returned `read task TASK-122: sql: expected 14 destination arguments in Scan, not 13`.
-> internal/board/board.go:31 taskColumns selects 14 columns, with doc_refs sixth. internal/board/get.go:10-13 Scan has 13 destinations and no holder for the references string, so doc_refs is dropped. Load (board.go:44-53) does it correctly — a local `references string` scanned in the doc_refs slot, then decodeReferences into t.References. Get was not updated when TASK-119 added doc_refs to taskColumns, and no test covers get_task, so nothing caught it: mcp/tools_test.go has three tests and none calls getTask.
-
-
 ## Done
 
 ### TASK-101 · Sync ROADMAP.md with shipped scope
@@ -251,6 +228,26 @@ references:
 > WHAT seraph WRITES. The omp target is Project: true with Path '.omp/hooks/pre/seraph-gate.ts', and an earlier run also left ~/.omp/hooks/pre/seraph-gate.ts. Neither directory is read by omp. The file was inert from the moment it was written.
 > THE SECOND MISMATCH. The generated module type-imports ExtensionFactory, which lives in dist/types/extensibility/extensions/types.d.ts — the EXTENSIONS subsystem. Hooks take HookAPI, from dist/types/extensibility/hooks/types.d.ts. Both types ship; seraph imported the wrong one. That alone would break the module even in a directory omp does read.
 > PROOF BEFORE FIX. A probe module written to ~/.omp/agent/hooks/ using HookAPI and the plain default-export shape was run against a real omp subprocess holding no claim. The shell command was refused with the gate's own message and /tmp/omp-gate-probe.txt was confirmed absent. The mechanism works; only the generator was wrong.
+
+### TASK-124 · get_task fails on every call: its Scan drops the doc_refs column
+
+> **Goal:** get_task is one of the six v1 tools and it returns an error for every task id, because Get scans taskColumns into 13 destinations while the query returns 14 — doc_refs has no home — so a reader cannot fetch a single task even though the Definition of done counts this tool as shipped.
+- priority: high
+- triage: ready-for-agent
+- updated: 2026-10-09T11:38:31Z
+references:
+  - internal/board/get.go
+  - internal/board/board.go
+
+> **Done when:** 1. Get scans every column taskColumns selects, carrying doc_refs through to the task's references exactly as Load does. [met: internal/board/get.go now declares `var references string`, scans it in the doc_refs slot, and sets t.References = decodeReferences(references) before returning — the same pattern Load uses]
+> **Done when:** 2. A test calls getTask on a real task and asserts its body comes back, not an error — the defect is pinned so it cannot return. [met: TestGetTaskReturnsTheTaskBody in internal/mcp/tools_test.go builds a real board through db.Open, sets two references, calls the real getTask, and asserts TASK-1, CONTEXT.md#index and docs/adr/0001 all appear in the body]
+> **Done when:** 3. Verified against this repository's own board, not a copy. [met: a throwaway main under the module called board.Get against /home/dimasajiwardhana/Documents/code/seraph/.seraph/state.db — TASK-122 and TASK-101 returned their titles, and TASK-124 returned refs [internal/board/get.go internal/board/board.go], so both the crash and the references round-trip are fixed. The harness was deleted afterwards; it was never committed]
+> **Done when:** 4. gofmt -l, go vet ./... and go test ./... all clean. [met: gofmt -l empty, go vet clean, go test ./... -count=1 green across board, db, doctor, gate, installer, mcp and tui]
+> **Done when:** 5. Done through the board with the claim held by the session that did the work. [met: claimed as omp, session omp-20261009T1119Z-main-01a12063; set done by that session]
+> **Done when:** STILL STALE, DELIBERATELY NOT TOUCHED. The running omp MCP server is the installed binary at ~/go/bin/seraph, which predates this fix, so get_task still fails through the live tool until that binary is rebuilt and reinstalled. Rebuilding into ~/go/bin is outside the 'record + commit locally' scope the owner set, so it was left for a decision rather than done silently. The fix landed in commit 61bc363.
+
+> Found while fetching TASK-122's detail: `get_task TASK-122` returned `read task TASK-122: sql: expected 14 destination arguments in Scan, not 13`.
+> internal/board/board.go:31 taskColumns selects 14 columns, with doc_refs sixth. internal/board/get.go:10-13 Scan has 13 destinations and no holder for the references string, so doc_refs is dropped. Load (board.go:44-53) does it correctly — a local `references string` scanned in the doc_refs slot, then decodeReferences into t.References. Get was not updated when TASK-119 added doc_refs to taskColumns, and no test covers get_task, so nothing caught it: mcp/tools_test.go has three tests and none calls getTask.
 
 ### TASK-105 · Document seraph gate, seraph hook and seraph version in USING.md
 
