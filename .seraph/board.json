@@ -1,6 +1,23 @@
 {
   "tasks": [
     {
+      "id": "TASK-125",
+      "title": "Commit the board snapshots after TASK-123 and TASK-124",
+      "goal": "The two rendered snapshots carry the TASK-122 reconciliation, TASK-123's close and TASK-124's record plus its fix, but they are staged and uncommitted, so the repository's committed board is behind its own database.",
+      "description": "Both snapshots are rendered from the database and were left staged when TASK-124 was closed. Committing them keeps the committed board and the source of truth in step, which is what a clone restores from.",
+      "acceptance": "1. .seraph/KANBAN.md and .seraph/board.json are committed so the committed board matches state.db.\n2. The commit contains the snapshots only; no source change is swept in.\n3. Done through the board with the claim held by the session that did the work.",
+      "status": "backlog",
+      "triage": "ready-for-agent",
+      "priority": "low",
+      "claim": {
+        "harness": "omp",
+        "session": "omp-20261009T1119Z-main-01a12063",
+        "expires": "2026-10-09T12:09:09Z"
+      },
+      "created_at": "2026-10-09T11:39:04Z",
+      "updated_at": "2026-10-09T11:39:09Z"
+    },
+    {
       "id": "TASK-101",
       "title": "Sync ROADMAP.md with shipped scope",
       "goal": "ROADMAP.md describes v1 as six MCP tools, but internal/ also ships webui, dashboard, tui, vocab and gate. Either the roadmap records that scope as carried forward with the reason it is not in v1, or the scope line is corrected. The roadmap must not silently disagree with the tree.",

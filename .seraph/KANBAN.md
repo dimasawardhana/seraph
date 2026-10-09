@@ -2,6 +2,23 @@
 
 _Written by Seraph. Do not edit — this file is replaced on every change._
 
+## Backlog
+
+### TASK-125 · Commit the board snapshots after TASK-123 and TASK-124
+
+> **Goal:** The two rendered snapshots carry the TASK-122 reconciliation, TASK-123's close and TASK-124's record plus its fix, but they are staged and uncommitted, so the repository's committed board is behind its own database.
+- priority: low
+- triage: ready-for-agent
+- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T12:09:09Z)
+- updated: 2026-10-09T11:39:09Z
+
+> **Done when:** 1. .seraph/KANBAN.md and .seraph/board.json are committed so the committed board matches state.db.
+> **Done when:** 2. The commit contains the snapshots only; no source change is swept in.
+> **Done when:** 3. Done through the board with the claim held by the session that did the work.
+
+> Both snapshots are rendered from the database and were left staged when TASK-124 was closed. Committing them keeps the committed board and the source of truth in step, which is what a clone restores from.
+
+
 ## Done
 
 ### TASK-101 · Sync ROADMAP.md with shipped scope
