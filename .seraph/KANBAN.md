@@ -2,53 +2,6 @@
 
 _Written by Seraph. Do not edit — this file is replaced on every change._
 
-## Backlog
-
-### TASK-130 · The omp gate is written to a directory omp never reads
-
-> **Goal:** TASK-114 moved install's omp gate to ~/.omp/agent/hooks/ on a misreading of the packaged README, but omp 18.0.3 never looks there — so `seraph hook` reports an installed gate that would not have fired, and the only reason writes were ever gated is that a stale copy from the OLD path was still on disk.
-- priority: high
-- triage: ready-for-agent
-- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T13:00:38Z)
-- updated: 2026-10-09T12:30:38Z
-references:
-  - internal/installer/hooks.go
-
-> **Done when:** 1. Hooks are written to a directory omp actually discovers, established by observation, not by reading a README.
-> **Done when:** 2. A fresh omp session loads the gate: a write is refused when it should be, and allowed when the session holds the claim.
-> **Done when:** 3. The old location is not left as a live gate file, and the code's comments no longer assert the wrong path.
-> **Done when:** 4. gofmt -l, go vet ./... and go test ./... all clean.
-> **Done when:** 5. Done through the board with the claim held by the session that did the work.
-
-> Found while testing the TASK-126 identity fix in a fresh omp session.
-> WHAT OMP 18.0.3 ACTUALLY DOES (measured, not read): probe hooks were written to four candidate directories and a real omp -p session was run for each. Only these fired: <repo>/.omp/hooks/pre/, <repo>/.claude/hooks/pre/, ~/.claude/hooks/pre/. These did NOT fire: ~/.omp/agent/hooks/ (where TASK-114 put the gate) and ~/.omp/hooks/pre/. The shipped bundle contains no "agent/hooks" string at all — the path is the README's, not the code's (bundle: `function Ntr(e){return{project:join(e.cwd,".omp"),user:Jt()}}` and a walk-up that adds `.omp/<pre|post>` at each ancestor; the .claude provider resolves `$CLAUDE_CONFIG_DIR|~/.claude`).
-> WHY IT MATTERED AND WAS NOT NOTICED. TASK-114 rewrote install to the ~/.omp/agent/hooks/ path, but the OLD file at <repo>/.omp/hooks/pre/seraph-gate.ts was still on disk and still loaded — so the gate kept firing and the new location's uselessness was invisible. That stale file also sent an empty session id, which is the identity bug TASK-126 fixed: the fix was written into a file omp never read.
-> THE FIX. The omp target is Project:true, Path '.omp/hooks/pre/seraph-gate.ts' — the path it had before TASK-114. Verified end to end: a fresh omp 18.0.3 headless session claimed a task under a deliberately wrong session id (the hook rewrote it to the real one), then ran a shell command while another task sat unclaimed — and was ALLOWED, creating the file. Under the old hook the same write was refused.
-> The dead gate seraph had written to ~/.omp/agent/hooks/seraph-gate.ts was removed, since a stale hook on disk is exactly what hid this defect.
-
-### TASK-128 · NEWSESSION-TEST-A: the task a fresh session will claim
-
-> **Goal:** Distractor task pair for proving the rebuilt omp hook gives a fresh session the session identity the gate reads, so its writes are honoured while another task remains unclaimed.
-- priority: low
-- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T13:00:38Z)
-- updated: 2026-10-09T12:30:38Z
-
-> **Done when:** 1. Used only to demonstrate the identity fix; closed after the run.
-
-> Test fixture. Safe to complete.
-
-### TASK-129 · NEWSESSION-TEST-B: the distractor that stays unclaimed
-
-> **Goal:** The second half of the fixture: this task must stay unclaimed so that a fresh session holding a claim still faces an unclaimed task, which is the condition under which the old hook refused every write.
-- priority: low
-- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T13:00:38Z)
-- updated: 2026-10-09T12:30:38Z
-
-> **Done when:** 1. Left unclaimed through the run; closed afterwards.
-
-> Test fixture. Safe to complete.
-
-
 ## Done
 
 ### TASK-101 · Sync ROADMAP.md with shipped scope
@@ -320,6 +273,27 @@ references:
 > THE IDENTITY GAP. omp starts the seraph MCP server with no SERAPH_SESSION_ID in its environment (verified: 82 env vars on the server process, none of them a session id), and the generated omp hook sends session_id: process.env.SERAPH_SESSION_ID ?? "" — an empty string. The gate therefore cannot attribute a claim to the session that made it. Observed live: every bash and edit in this session was refused with 'this session holds no task ... N task(s) are unclaimed' until the board held zero unclaimed tasks, at which point someClaimExists let it through. That is the TASK-112 disagreement, still open for omp.
 > THE CHANNEL THAT FIXES IT. ctx.sessionManager in a tool_call hook is a ReadonlySessionManager with getSessionId(): string — the harness's own session identity, which the hook can read even though it cannot set the MCP server's environment. The hook can also revise the input a tool runs with (ToolCallEventResult.input), so it can write that id into the agent's own claim/update/release payloads. One source of truth for both sides.
 > THE STALE BINARY. ~/go/bin/seraph (what omp spawns) was built before TASK-124, so get_task still answers with the Scan error through MCP even though the source is fixed at 61bc363.
+
+### TASK-130 · The omp gate is written to a directory omp never reads
+
+> **Goal:** TASK-114 moved install's omp gate to ~/.omp/agent/hooks/ on a misreading of the packaged README, but omp 18.0.3 never looks there — so `seraph hook` reports an installed gate that would not have fired, and the only reason writes were ever gated is that a stale copy from the OLD path was still on disk.
+- priority: high
+- triage: ready-for-agent
+- updated: 2026-10-09T12:31:08Z
+references:
+  - internal/installer/hooks.go
+
+> **Done when:** 1. Hooks are written to a directory omp actually discovers, established by observation, not by reading a README. [MET: four probe hooks were written to four candidate directories and a real `omp -p` session was run for each. Fired: <repo>/.omp/hooks/pre/, <repo>/.claude/hooks/pre/, ~/.claude/hooks/pre/. Did NOT fire: ~/.omp/agent/hooks/ and ~/.omp/hooks/pre/. The shipped bundle confirms it — no "agent/hooks" string exists in it; the omp provider resolves `project: join(cwd, ".omp")` and walks up adding `.omp/{pre,post}`, and the Claude provider resolves `$CLAUDE_CONFIG_DIR|~/.claude`.]
+> **Done when:** 2. A fresh omp session loads the gate: a write is refused when it should be, and allowed when the session holds the claim. [MET, end to end. A fresh omp 18.0.3 headless session claimed TASK-128 with a deliberately wrong session id and then ran a shell command while TASK-129 sat unclaimed. The claim came back holding the REAL session id (the hook rewrote it), and the shell command was ALLOWED — the proof file /tmp/seraph-newsession-proof.txt contains `ok`. Under the pre-fix hook the same write was refused with 'this session holds no task'.]
+> **Done when:** 3. The old location is not left as a live gate file, and the code's comments no longer assert the wrong path. [MET: the dead gate at ~/.omp/agent/hooks/seraph-gate.ts was removed, and the two stale copies at ~/.omp/hooks/pre/ and <repo>/.omp/hooks/pre/ (pre-TASK-114) were removed too — a stale hook on disk is exactly what hid this defect. The omp target's comment and ompHookSource's doc now describe the measured discovery, and name TASK-114's mistake.]
+> **Done when:** 4. gofmt -l, go vet ./... and go test ./... all clean. [MET: gofmt -l empty, go vet clean, go test ./... -count=1 green across board, db, doctor, gate, installer, mcp and tui.]
+> **Done when:** 5. Done through the board with the claim held by the session that did the work. [MET: claimed and set done by session omp-20261009T1119Z-main-01a12063. Committed as 0a9e3c3, with the binary rebuilt and `seraph install` re-run so the gate now lands in <root>/.omp/hooks/pre/.]
+
+> Found while testing the TASK-126 identity fix in a fresh omp session.
+> WHAT OMP 18.0.3 ACTUALLY DOES (measured, not read): probe hooks were written to four candidate directories and a real omp -p session was run for each. Only these fired: <repo>/.omp/hooks/pre/, <repo>/.claude/hooks/pre/, ~/.claude/hooks/pre/. These did NOT fire: ~/.omp/agent/hooks/ (where TASK-114 put the gate) and ~/.omp/hooks/pre/. The shipped bundle contains no "agent/hooks" string at all — the path is the README's, not the code's (bundle: `function Ntr(e){return{project:join(e.cwd,".omp"),user:Jt()}}` and a walk-up that adds `.omp/<pre|post>` at each ancestor; the .claude provider resolves `$CLAUDE_CONFIG_DIR|~/.claude`).
+> WHY IT MATTERED AND WAS NOT NOTICED. TASK-114 rewrote install to the ~/.omp/agent/hooks/ path, but the OLD file at <repo>/.omp/hooks/pre/seraph-gate.ts was still on disk and still loaded — so the gate kept firing and the new location's uselessness was invisible. That stale file also sent an empty session id, which is the identity bug TASK-126 fixed: the fix was written into a file omp never read.
+> THE FIX. The omp target is Project:true, Path '.omp/hooks/pre/seraph-gate.ts' — the path it had before TASK-114. Verified end to end: a fresh omp 18.0.3 headless session claimed a task under a deliberately wrong session id (the hook rewrote it to the real one), then ran a shell command while another task sat unclaimed — and was ALLOWED, creating the file. Under the old hook the same write was refused.
+> The dead gate seraph had written to ~/.omp/agent/hooks/seraph-gate.ts was removed, since a stale hook on disk is exactly what hid this defect.
 
 ### TASK-105 · Document seraph gate, seraph hook and seraph version in USING.md
 
@@ -611,4 +585,24 @@ references:
 > **Done when:** WHY ONE COMMIT IS MADE OUTSIDE THE GATE. This task's own close re-renders the snapshots, so the commit that satisfies criterion 1 strictly has to happen after the claim is released. At that point the board holds no unclaimed task and no live claim, so the omp hook — still the pre-fix module loaded when this session started — refuses the write. That refusal is exactly the defect TASK-126 fixed, and the fixed module is on disk for the next session. Forcing a new task and claim just to make that one commit would mutate the board again and recreate the same lag, so the final render is committed directly rather than through a loop that cannot terminate.
 
 > Same one-step lag TASK-125 recorded: closing a task mutates the board, which re-renders both snapshots, which then sit uncommitted. This closes that loop after TASK-126.
+
+### TASK-128 · NEWSESSION-TEST-A: the task a fresh session will claim
+
+> **Goal:** Distractor task pair for proving the rebuilt omp hook gives a fresh session the session identity the gate reads, so its writes are honoured while another task remains unclaimed.
+- priority: low
+- updated: 2026-10-09T12:30:58Z
+
+> **Done when:** 1. Used only to demonstrate the identity fix; closed after the run. [met: it was claimed by a fresh omp 18.0.3 session, which then ran a shell command while TASK-129 stayed unclaimed and was allowed — the whole point of the fixture. Closed as a completed test artefact.]
+
+> Test fixture. Safe to complete.
+
+### TASK-129 · NEWSESSION-TEST-B: the distractor that stays unclaimed
+
+> **Goal:** The second half of the fixture: this task must stay unclaimed so that a fresh session holding a claim still faces an unclaimed task, which is the condition under which the old hook refused every write.
+- priority: low
+- updated: 2026-10-09T12:30:58Z
+
+> **Done when:** 1. Left unclaimed through the run; closed afterwards. [met: it stayed unclaimed for the duration of the fresh-session test, which is exactly what made the write a real test of the gate, and was claimed only to close it here.]
+
+> Test fixture. Safe to complete.
 
