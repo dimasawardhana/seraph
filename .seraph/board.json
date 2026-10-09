@@ -1,21 +1,26 @@
 {
   "tasks": [
     {
-      "id": "TASK-125",
-      "title": "Commit the board snapshots after TASK-123 and TASK-124",
-      "goal": "The two rendered snapshots carry the TASK-122 reconciliation, TASK-123's close and TASK-124's record plus its fix, but they are staged and uncommitted, so the repository's committed board is behind its own database.",
-      "description": "Both snapshots are rendered from the database and were left staged when TASK-124 was closed. Committing them keeps the committed board and the source of truth in step, which is what a clone restores from.",
-      "acceptance": "1. .seraph/KANBAN.md and .seraph/board.json are committed so the committed board matches state.db.\n2. The commit contains the snapshots only; no source change is swept in.\n3. Done through the board with the claim held by the session that did the work.",
+      "id": "TASK-126",
+      "title": "The omp gate cannot see a session's real identity, and the installed binary is stale",
+      "goal": "Under omp a session claims a task and is then refused the writes it is entitled to make, because the hook sends an empty session id to the gate while the agent's claim carries another, and the installed seraph binary predates the get_task fix so that tool still errors for every caller.",
+      "description": "Both defects were found while landing TASK-123, and both are recorded there as left open.\n\nTHE IDENTITY GAP. omp starts the seraph MCP server with no SERAPH_SESSION_ID in its environment (verified: 82 env vars on the server process, none of them a session id), and the generated omp hook sends session_id: process.env.SERAPH_SESSION_ID ?? \"\" — an empty string. The gate therefore cannot attribute a claim to the session that made it. Observed live: every bash and edit in this session was refused with 'this session holds no task ... N task(s) are unclaimed' until the board held zero unclaimed tasks, at which point someClaimExists let it through. That is the TASK-112 disagreement, still open for omp.\n\nTHE CHANNEL THAT FIXES IT. ctx.sessionManager in a tool_call hook is a ReadonlySessionManager with getSessionId(): string — the harness's own session identity, which the hook can read even though it cannot set the MCP server's environment. The hook can also revise the input a tool runs with (ToolCallEventResult.input), so it can write that id into the agent's own claim/update/release payloads. One source of truth for both sides.\n\nTHE STALE BINARY. ~/go/bin/seraph (what omp spawns) was built before TASK-124, so get_task still answers with the Scan error through MCP even though the source is fixed at 61bc363.",
+      "acceptance": "1. The generated omp hook reads the session id from the harness's own session manager (ctx.sessionManager.getSessionId) and passes it to `seraph gate`, so a claim and the gate name the same session.\n2. The same hook gives seraph's lifecycle calls — claim_task, update_task, release_task — that id, so an agent never has to know or guess it, and is never scolded for a mismatch it cannot avoid.\n3. An installer test pins the generated module's shape, and the module still passes installedBy so `seraph hook` does not regress.\n4. The binary is rebuilt and reinstalled, so the live MCP server carries the get_task fix (TASK-124) and this identity fix.\n5. Verified live under omp: a claim taken without an explicit session id is honoured by the gate while other tasks remain unclaimed.\n6. gofmt -l, go vet ./... and go test ./... all clean.\n7. Done through the board with the claim held by the session that did the work.",
       "status": "backlog",
       "triage": "ready-for-agent",
-      "priority": "low",
+      "priority": "high",
+      "references": [
+        "internal/installer/hooks.go",
+        "internal/gate/command.go",
+        "internal/mcp/tools.go"
+      ],
       "claim": {
         "harness": "omp",
         "session": "omp-20261009T1119Z-main-01a12063",
-        "expires": "2026-10-09T12:09:09Z"
+        "expires": "2026-10-09T12:19:22Z"
       },
-      "created_at": "2026-10-09T11:39:04Z",
-      "updated_at": "2026-10-09T11:39:09Z"
+      "created_at": "2026-10-09T11:49:05Z",
+      "updated_at": "2026-10-09T11:49:22Z"
     },
     {
       "id": "TASK-101",
@@ -322,6 +327,19 @@
       "claim": null,
       "created_at": "2026-10-09T11:34:02Z",
       "updated_at": "2026-10-09T11:37:17Z"
+    },
+    {
+      "id": "TASK-125",
+      "title": "Commit the board snapshots after TASK-123 and TASK-124",
+      "goal": "The two rendered snapshots carry the TASK-122 reconciliation, TASK-123's close and TASK-124's record plus its fix, but they are staged and uncommitted, so the repository's committed board is behind its own database.",
+      "description": "Both snapshots are rendered from the database and were left staged when TASK-124 was closed. Committing them keeps the committed board and the source of truth in step, which is what a clone restores from.",
+      "acceptance": "1. .seraph/KANBAN.md and .seraph/board.json are committed so the committed board matches state.db. [met: commit 6f7f6f4 carried both snapshots; at that commit the rendered board matched the database, including TASK-125's claim line]\n2. The commit contains the snapshots only; no source change is swept in. [met: 6f7f6f4 shows exactly .seraph/KANBAN.md and .seraph/board.json, 34 insertions, nothing else]\n3. Done through the board with the claim held by the session that did the work. [met: claimed and set done by session omp-20261009T1119Z-main-01a12063]\n\nNOTE ON THE LAST RENDER. Closing this task is itself a board mutation, so the two snapshots re-rendered with TASK-125 marked done and are left uncommitted by one render — the same one-step lag every close produces. Committing that final render needs a claim to pass the gate, and closing released it, which is exactly the TASK-112 identity gap recorded on TASK-123: an omp session whose SERAPH_SESSION_ID is empty cannot commit under the hook once the board has no unclaimed task. Left for the next session's commit rather than forced through.",
+      "status": "done",
+      "triage": "ready-for-agent",
+      "priority": "low",
+      "claim": null,
+      "created_at": "2026-10-09T11:39:04Z",
+      "updated_at": "2026-10-09T11:40:03Z"
     }
   ]
 }

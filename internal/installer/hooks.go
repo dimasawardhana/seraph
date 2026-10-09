@@ -421,6 +421,14 @@ func installedBy(harness, raw string) bool {
 // to the EXTENSIONS subsystem and does not resolve here. And it must land in
 // ~/.omp/agent/hooks/, the only native directory omp reads — see the omp target above.
 //
+// A third was missing. The hook sent an empty session id, because omp starts the seraph
+// server with no SERAPH_SESSION_ID in its environment and the agent cannot know the id the
+// gate will read. So a session claimed under one id and the gate judged writes under an
+// empty one, and every write the claim entitled was refused as though nothing were held.
+// omp's own session manager does know the id — ctx.sessionManager.getSessionId() — and the
+// hook can revise the input a tool runs with, so the module stamps that one id into both
+// the gate payload and seraph's lifecycle calls. One identity, from one source.
+//
 // That class of mistake fails in the worst available way. The module does not throw where
 // an agent would notice; the harness logs the load error, carries on without the hook, and
 // the agent writes files exactly as if no gate existed. The health report agreed the whole
@@ -432,10 +440,16 @@ import type { HookAPI } from "@oh-my-pi/pi-coding-agent";
 
 const GATE = %s;
 const READ_ONLY = /^(read|grep|glob|search|list|ls|cat|webfetch|websearch|fetch|todo)/i;
+const LIFECYCLE = ["claim_task", "update_task", "release_task"];
 
 export default function (pi: HookAPI) {
   pi.on("tool_call", async (event, ctx) => {
     const toolName = String(event.toolName ?? "");
+    const sessionId = sessionOf(ctx);
+
+    const stamped = stampSession(toolName, event.input, sessionId);
+    if (stamped) return { input: stamped };
+
     if (READ_ONLY.test(toolName)) return undefined;
 
     const proc = spawnSync(GATE, ["gate", "--harness", "omp"], {
@@ -443,7 +457,7 @@ export default function (pi: HookAPI) {
         tool_name: toolName,
         tool_input: event.input ?? {},
         cwd: ctx?.cwd ?? process.cwd(),
-        session_id: process.env.SERAPH_SESSION_ID ?? "",
+        session_id: sessionId,
       }),
       encoding: "utf8",
     });
@@ -454,6 +468,42 @@ export default function (pi: HookAPI) {
     }
     return undefined;
   });
+}
+
+// sessionOf reads the harness's own session identity. It is the only place that id exists:
+// omp starts the seraph server with no SERAPH_SESSION_ID in its environment, so neither the
+// agent nor the gate can discover it any other way.
+function sessionOf(ctx: any): string {
+  try {
+    return String(ctx?.sessionManager?.getSessionId?.() ?? "");
+  } catch {
+    return "";
+  }
+}
+
+// stampSession revises a seraph lifecycle call so its payload carries the harness's real
+// session id, whatever the agent typed — the same id the gate is given above. It returns
+// undefined for every other call, so ordinary writes are left exactly as the agent made
+// them. The payload arrives as a JSON string in the content field when the tool reaches seraph
+// through a device path, and as plain arguments when it does not; both are handled.
+function stampSession(toolName: string, input: any, sessionId: string): any {
+  if (!sessionId || !input) return undefined;
+  const target = String(input.path ?? input.uri ?? "");
+  const isLifecycle = LIFECYCLE.some(
+    (t) => toolName.toLowerCase().includes(t) || target.toLowerCase().includes(t),
+  );
+  if (!isLifecycle) return undefined;
+
+  if (typeof input.content === "string") {
+    try {
+      const body = JSON.parse(input.content);
+      body.session_id = sessionId;
+      return { ...input, content: JSON.stringify(body) };
+    } catch {
+      return undefined;
+    }
+  }
+  return { ...input, session_id: sessionId };
 }
 `, tsString(seraphBin))
 }

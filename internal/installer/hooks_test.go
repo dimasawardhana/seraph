@@ -158,3 +158,33 @@ func TestVersionHoldsIsContainmentNotEquality(t *testing.T) {
 		t.Error("an entry with no version token can never be shown to hold")
 	}
 }
+
+// The omp hook is the only place a session's real identity can be found: omp starts the
+// seraph server with no SERAPH_SESSION_ID in its environment, so the agent cannot know the
+// id the gate reads, and a claim made under any other id is refused as though nothing were
+// held. The generated module must read the id from the harness's own session manager and
+// put it in both the gate payload and seraph's lifecycle calls.
+func TestTheOmpHookCarriesTheHarnessSessionId(t *testing.T) {
+	src := ompHookSource("/home/someone/go/bin/seraph")
+
+	for _, want := range []string{
+		"ctx?.sessionManager?.getSessionId?.()",
+		"session_id: sessionId",
+		`["claim_task", "update_task", "release_task"]`,
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("generated omp hook is missing %q; a claim and the gate would name different sessions", want)
+		}
+	}
+
+	// The revision must reach the payload the tool actually runs with, not just the gate.
+	if !strings.Contains(src, "return { input: stamped }") {
+		t.Error("generated omp hook never revises a lifecycle call's input with the session id")
+	}
+
+	// TASK-106's detection depends on this exact shape. Losing it would report an installed
+	// gate as missing the moment the template changed.
+	if !installedBy("omp", src) {
+		t.Error("the generated omp hook no longer satisfies installedBy, so `seraph hook` would regress")
+	}
+}

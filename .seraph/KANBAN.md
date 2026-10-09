@@ -4,19 +4,30 @@ _Written by Seraph. Do not edit — this file is replaced on every change._
 
 ## Backlog
 
-### TASK-125 · Commit the board snapshots after TASK-123 and TASK-124
+### TASK-126 · The omp gate cannot see a session's real identity, and the installed binary is stale
 
-> **Goal:** The two rendered snapshots carry the TASK-122 reconciliation, TASK-123's close and TASK-124's record plus its fix, but they are staged and uncommitted, so the repository's committed board is behind its own database.
-- priority: low
+> **Goal:** Under omp a session claims a task and is then refused the writes it is entitled to make, because the hook sends an empty session id to the gate while the agent's claim carries another, and the installed seraph binary predates the get_task fix so that tool still errors for every caller.
+- priority: high
 - triage: ready-for-agent
-- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T12:09:09Z)
-- updated: 2026-10-09T11:39:09Z
+- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T12:19:22Z)
+- updated: 2026-10-09T11:49:22Z
+references:
+  - internal/installer/hooks.go
+  - internal/gate/command.go
+  - internal/mcp/tools.go
 
-> **Done when:** 1. .seraph/KANBAN.md and .seraph/board.json are committed so the committed board matches state.db.
-> **Done when:** 2. The commit contains the snapshots only; no source change is swept in.
-> **Done when:** 3. Done through the board with the claim held by the session that did the work.
+> **Done when:** 1. The generated omp hook reads the session id from the harness's own session manager (ctx.sessionManager.getSessionId) and passes it to `seraph gate`, so a claim and the gate name the same session.
+> **Done when:** 2. The same hook gives seraph's lifecycle calls — claim_task, update_task, release_task — that id, so an agent never has to know or guess it, and is never scolded for a mismatch it cannot avoid.
+> **Done when:** 3. An installer test pins the generated module's shape, and the module still passes installedBy so `seraph hook` does not regress.
+> **Done when:** 4. The binary is rebuilt and reinstalled, so the live MCP server carries the get_task fix (TASK-124) and this identity fix.
+> **Done when:** 5. Verified live under omp: a claim taken without an explicit session id is honoured by the gate while other tasks remain unclaimed.
+> **Done when:** 6. gofmt -l, go vet ./... and go test ./... all clean.
+> **Done when:** 7. Done through the board with the claim held by the session that did the work.
 
-> Both snapshots are rendered from the database and were left staged when TASK-124 was closed. Committing them keeps the committed board and the source of truth in step, which is what a clone restores from.
+> Both defects were found while landing TASK-123, and both are recorded there as left open.
+> THE IDENTITY GAP. omp starts the seraph MCP server with no SERAPH_SESSION_ID in its environment (verified: 82 env vars on the server process, none of them a session id), and the generated omp hook sends session_id: process.env.SERAPH_SESSION_ID ?? "" — an empty string. The gate therefore cannot attribute a claim to the session that made it. Observed live: every bash and edit in this session was refused with 'this session holds no task ... N task(s) are unclaimed' until the board held zero unclaimed tasks, at which point someClaimExists let it through. That is the TASK-112 disagreement, still open for omp.
+> THE CHANNEL THAT FIXES IT. ctx.sessionManager in a tool_call hook is a ReadonlySessionManager with getSessionId(): string — the harness's own session identity, which the hook can read even though it cannot set the MCP server's environment. The hook can also revise the input a tool runs with (ToolCallEventResult.input), so it can write that id into the agent's own claim/update/release payloads. One source of truth for both sides.
+> THE STALE BINARY. ~/go/bin/seraph (what omp spawns) was built before TASK-124, so get_task still answers with the Scan error through MCP even though the source is fixed at 61bc363.
 
 
 ## Done
@@ -528,4 +539,18 @@ references:
 > **Done when:** NOTE ON THE GATE. Every write in this task was refused until the board held zero unclaimed tasks, because the omp hook passes SERAPH_SESSION_ID, which is empty in this environment, so the gate could not match the claim this session held as its own. Claiming both backlog tasks cleared the last unclaimed slot and the writes went through. That is the TASK-112 identity gap observed live, not worked around: the claude-code harness would have given the gate a real SERAPH_SESSION_ID.
 
 > Found while checking status. git status showed 9 modified paths and 1 untracked file (internal/tui/render_test.go) left from TASK-120/121/122. TASK-122's board entry has status done with all five acceptance boxes still [ ] — the record claiming less than the work did, the same defect class this board exists to end. No code change is in scope here; the source was verified as already fixed (render.go:145 cuts the ID, schema.go:115 rejects empty migration entries).
+
+### TASK-125 · Commit the board snapshots after TASK-123 and TASK-124
+
+> **Goal:** The two rendered snapshots carry the TASK-122 reconciliation, TASK-123's close and TASK-124's record plus its fix, but they are staged and uncommitted, so the repository's committed board is behind its own database.
+- priority: low
+- triage: ready-for-agent
+- updated: 2026-10-09T11:40:03Z
+
+> **Done when:** 1. .seraph/KANBAN.md and .seraph/board.json are committed so the committed board matches state.db. [met: commit 6f7f6f4 carried both snapshots; at that commit the rendered board matched the database, including TASK-125's claim line]
+> **Done when:** 2. The commit contains the snapshots only; no source change is swept in. [met: 6f7f6f4 shows exactly .seraph/KANBAN.md and .seraph/board.json, 34 insertions, nothing else]
+> **Done when:** 3. Done through the board with the claim held by the session that did the work. [met: claimed and set done by session omp-20261009T1119Z-main-01a12063]
+> **Done when:** NOTE ON THE LAST RENDER. Closing this task is itself a board mutation, so the two snapshots re-rendered with TASK-125 marked done and are left uncommitted by one render — the same one-step lag every close produces. Committing that final render needs a claim to pass the gate, and closing released it, which is exactly the TASK-112 identity gap recorded on TASK-123: an omp session whose SERAPH_SESSION_ID is empty cannot commit under the hook once the board has no unclaimed task. Left for the next session's commit rather than forced through.
+
+> Both snapshots are rendered from the database and were left staged when TASK-124 was closed. Committing them keeps the committed board and the source of truth in step, which is what a clone restores from.
 
