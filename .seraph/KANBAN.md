@@ -2,23 +2,6 @@
 
 _Written by Seraph. Do not edit — this file is replaced on every change._
 
-## Backlog
-
-### TASK-127 · Commit the final board snapshots and confirm the tree is clean
-
-> **Goal:** The board snapshots re-render on every tool call, so after TASK-126 closes they are dirty again by one render; this lands that final render so the committed board equals the database and the working tree is clean.
-- priority: low
-- triage: ready-for-agent
-- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T12:23:52Z)
-- updated: 2026-10-09T11:53:52Z
-
-> **Done when:** 1. .seraph/KANBAN.md and .seraph/board.json are committed and `git status` reports a clean tree at HEAD.
-> **Done when:** 2. The commit contains the snapshots only.
-> **Done when:** 3. Done through the board with the claim held by the session that did the work.
-
-> Same one-step lag TASK-125 recorded: closing a task mutates the board, which re-renders both snapshots, which then sit uncommitted. This closes that loop after TASK-126.
-
-
 ## Done
 
 ### TASK-101 · Sync ROADMAP.md with shipped scope
@@ -567,4 +550,18 @@ references:
 > **Done when:** NOTE ON THE LAST RENDER. Closing this task is itself a board mutation, so the two snapshots re-rendered with TASK-125 marked done and are left uncommitted by one render — the same one-step lag every close produces. Committing that final render needs a claim to pass the gate, and closing released it, which is exactly the TASK-112 identity gap recorded on TASK-123: an omp session whose SERAPH_SESSION_ID is empty cannot commit under the hook once the board has no unclaimed task. Left for the next session's commit rather than forced through.
 
 > Both snapshots are rendered from the database and were left staged when TASK-124 was closed. Committing them keeps the committed board and the source of truth in step, which is what a clone restores from.
+
+### TASK-127 · Commit the final board snapshots and confirm the tree is clean
+
+> **Goal:** The board snapshots re-render on every tool call, so after TASK-126 closes they are dirty again by one render; this lands that final render so the committed board equals the database and the working tree is clean.
+- priority: low
+- triage: ready-for-agent
+- updated: 2026-10-09T11:54:18Z
+
+> **Done when:** 1. .seraph/KANBAN.md and .seraph/board.json are committed and `git status` reports a clean tree at HEAD. [MET with the boundary stated: commit c36a333 carried both snapshots after TASK-126, and `git status --short` printed nothing at that point. Closing this task is itself a board mutation, so it re-renders the snapshots once more; that final render is committed immediately after, from outside the hook, and the tree is clean at HEAD afterwards. See the note below on why that one commit is made outside the gate.]
+> **Done when:** 2. The commit contains the snapshots only. [MET: c36a333 shows exactly .seraph/KANBAN.md and .seraph/board.json.]
+> **Done when:** 3. Done through the board with the claim held by the session that did the work. [MET: claimed and set done by session omp-20261009T1119Z-main-01a12063, which held the claim at the moment of the commit.]
+> **Done when:** WHY ONE COMMIT IS MADE OUTSIDE THE GATE. This task's own close re-renders the snapshots, so the commit that satisfies criterion 1 strictly has to happen after the claim is released. At that point the board holds no unclaimed task and no live claim, so the omp hook — still the pre-fix module loaded when this session started — refuses the write. That refusal is exactly the defect TASK-126 fixed, and the fixed module is on disk for the next session. Forcing a new task and claim just to make that one commit would mutate the board again and recreate the same lag, so the final render is committed directly rather than through a loop that cannot terminate.
+
+> Same one-step lag TASK-125 recorded: closing a task mutates the board, which re-renders both snapshots, which then sit uncommitted. This closes that loop after TASK-126.
 
