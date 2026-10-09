@@ -7,9 +7,10 @@ import (
 
 func Get(handle *sql.DB, taskID string) (Task, error) {
 	var t Task
+	var references string
 	err := handle.QueryRow("SELECT "+taskColumns+" FROM tasks WHERE id = ?", taskID).Scan(
-		&t.ID, &t.Title, &t.Goal, &t.Description, &t.Acceptance, &t.Status, &t.Triage,
-		&t.Priority, &t.ClaimHarness, &t.ClaimSession, &t.ClaimExpires,
+		&t.ID, &t.Title, &t.Goal, &t.Description, &t.Acceptance, &references, &t.Status,
+		&t.Triage, &t.Priority, &t.ClaimHarness, &t.ClaimSession, &t.ClaimExpires,
 		&t.CreatedAt, &t.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return t, &Error{Reason: ReasonTaskNotFound, Message: fmt.Sprintf("no task %s", taskID)}
@@ -17,6 +18,7 @@ func Get(handle *sql.DB, taskID string) (Task, error) {
 	if err != nil {
 		return t, fmt.Errorf("read task %s: %w", taskID, err)
 	}
+	t.References = decodeReferences(references)
 	return t, nil
 }
 

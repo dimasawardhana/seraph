@@ -92,3 +92,28 @@ func TestClaimIsSilentWhenTheEnvironmentIsUnset(t *testing.T) {
 		t.Errorf("a harness that cannot supply an ambient value must not be scolded, got:\n%s", got)
 	}
 }
+
+// get_task answered with a Scan error for every id because Get dropped the doc_refs
+// column taskColumns selects. This calls the real tool on a real task and asserts the body
+// comes back — references included — so the defect cannot return unnoticed.
+func TestGetTaskReturnsTheTaskBody(t *testing.T) {
+	handle, _ := newClaimableBoard(t)
+	if _, err := handle.Exec(`UPDATE tasks SET doc_refs = ? WHERE id = 'TASK-1'`,
+		`["CONTEXT.md#index","docs/adr/0001"]`); err != nil {
+		t.Fatalf("set references: %v", err)
+	}
+
+	result, _, err := getTask(handle)(context.Background(), nil, getTaskArgs{TaskID: "TASK-1"})
+	if err != nil {
+		t.Fatalf("get_task returned a protocol error: %v", err)
+	}
+	content, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatalf("expected text content, got %T", result.Content[0])
+	}
+	for _, want := range []string{"TASK-1", "CONTEXT.md#index", "docs/adr/0001"} {
+		if !strings.Contains(content.Text, want) {
+			t.Errorf("get_task body is missing %q, got:\n%s", want, content.Text)
+		}
+	}
+}
