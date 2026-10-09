@@ -4,30 +4,19 @@ _Written by Seraph. Do not edit — this file is replaced on every change._
 
 ## Backlog
 
-### TASK-126 · The omp gate cannot see a session's real identity, and the installed binary is stale
+### TASK-127 · Commit the final board snapshots and confirm the tree is clean
 
-> **Goal:** Under omp a session claims a task and is then refused the writes it is entitled to make, because the hook sends an empty session id to the gate while the agent's claim carries another, and the installed seraph binary predates the get_task fix so that tool still errors for every caller.
-- priority: high
+> **Goal:** The board snapshots re-render on every tool call, so after TASK-126 closes they are dirty again by one render; this lands that final render so the committed board equals the database and the working tree is clean.
+- priority: low
 - triage: ready-for-agent
-- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T12:19:22Z)
-- updated: 2026-10-09T11:49:22Z
-references:
-  - internal/installer/hooks.go
-  - internal/gate/command.go
-  - internal/mcp/tools.go
+- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T12:23:52Z)
+- updated: 2026-10-09T11:53:52Z
 
-> **Done when:** 1. The generated omp hook reads the session id from the harness's own session manager (ctx.sessionManager.getSessionId) and passes it to `seraph gate`, so a claim and the gate name the same session.
-> **Done when:** 2. The same hook gives seraph's lifecycle calls — claim_task, update_task, release_task — that id, so an agent never has to know or guess it, and is never scolded for a mismatch it cannot avoid.
-> **Done when:** 3. An installer test pins the generated module's shape, and the module still passes installedBy so `seraph hook` does not regress.
-> **Done when:** 4. The binary is rebuilt and reinstalled, so the live MCP server carries the get_task fix (TASK-124) and this identity fix.
-> **Done when:** 5. Verified live under omp: a claim taken without an explicit session id is honoured by the gate while other tasks remain unclaimed.
-> **Done when:** 6. gofmt -l, go vet ./... and go test ./... all clean.
-> **Done when:** 7. Done through the board with the claim held by the session that did the work.
+> **Done when:** 1. .seraph/KANBAN.md and .seraph/board.json are committed and `git status` reports a clean tree at HEAD.
+> **Done when:** 2. The commit contains the snapshots only.
+> **Done when:** 3. Done through the board with the claim held by the session that did the work.
 
-> Both defects were found while landing TASK-123, and both are recorded there as left open.
-> THE IDENTITY GAP. omp starts the seraph MCP server with no SERAPH_SESSION_ID in its environment (verified: 82 env vars on the server process, none of them a session id), and the generated omp hook sends session_id: process.env.SERAPH_SESSION_ID ?? "" — an empty string. The gate therefore cannot attribute a claim to the session that made it. Observed live: every bash and edit in this session was refused with 'this session holds no task ... N task(s) are unclaimed' until the board held zero unclaimed tasks, at which point someClaimExists let it through. That is the TASK-112 disagreement, still open for omp.
-> THE CHANNEL THAT FIXES IT. ctx.sessionManager in a tool_call hook is a ReadonlySessionManager with getSessionId(): string — the harness's own session identity, which the hook can read even though it cannot set the MCP server's environment. The hook can also revise the input a tool runs with (ToolCallEventResult.input), so it can write that id into the agent's own claim/update/release payloads. One source of truth for both sides.
-> THE STALE BINARY. ~/go/bin/seraph (what omp spawns) was built before TASK-124, so get_task still answers with the Scan error through MCP even though the source is fixed at 61bc363.
+> Same one-step lag TASK-125 recorded: closing a task mutates the board, which re-renders both snapshots, which then sit uncommitted. This closes that loop after TASK-126.
 
 
 ## Done
@@ -276,6 +265,31 @@ references:
 
 > Found while fetching TASK-122's detail: `get_task TASK-122` returned `read task TASK-122: sql: expected 14 destination arguments in Scan, not 13`.
 > internal/board/board.go:31 taskColumns selects 14 columns, with doc_refs sixth. internal/board/get.go:10-13 Scan has 13 destinations and no holder for the references string, so doc_refs is dropped. Load (board.go:44-53) does it correctly — a local `references string` scanned in the doc_refs slot, then decodeReferences into t.References. Get was not updated when TASK-119 added doc_refs to taskColumns, and no test covers get_task, so nothing caught it: mcp/tools_test.go has three tests and none calls getTask.
+
+### TASK-126 · The omp gate cannot see a session's real identity, and the installed binary is stale
+
+> **Goal:** Under omp a session claims a task and is then refused the writes it is entitled to make, because the hook sends an empty session id to the gate while the agent's claim carries another, and the installed seraph binary predates the get_task fix so that tool still errors for every caller.
+- priority: high
+- triage: ready-for-agent
+- updated: 2026-10-09T11:53:37Z
+references:
+  - internal/installer/hooks.go
+  - internal/gate/command.go
+  - internal/mcp/tools.go
+
+> **Done when:** 1. The generated omp hook reads the session id from the harness's own session manager (ctx.sessionManager.getSessionId) and passes it to `seraph gate`, so a claim and the gate name the same session. [MET: ompHookSource now emits `const sessionId = sessionOf(ctx)` with `sessionOf` calling `ctx?.sessionManager?.getSessionId?.()`, and sends `session_id: sessionId` in the gate payload. omp's own types confirm the accessor: ReadonlySessionManager includes getSessionId(): string (session/session-manager.d.ts:13, :202).]
+> **Done when:** 2. The same hook gives seraph's lifecycle calls — claim_task, update_task, release_task — that id, so an agent never has to know or guess it, and is never scolded for a mismatch it cannot avoid. [MET: stampSession rewrites a lifecycle call's input with the id before the hook excuses it, parsing the device payload's JSON content string and setting session_id, or setting it directly when the arguments are not a device body. Verified functionally, not by reading: a driver ran the generated module under bun and a claim_task device call came back with content {"task_id":"TASK-9","session_id":"omp-real-session-1"}.]
+> **Done when:** 3. An installer test pins the generated module's shape, and the module still passes installedBy so `seraph hook` does not regress. [MET: TestTheOmpHookCarriesTheHarnessSessionId asserts the getSessionId call, the session_id field, the LIFECYCLE list, the input revision, and installedBy("omp", src). `seraph hook` still reports omp as 'enforcing (verified omp 18.0.3, 2026-10-05)'.]
+> **Done when:** 4. The binary is rebuilt and reinstalled, so the live MCP server carries the get_task fix (TASK-124) and this identity fix. [MET: go build wrote ~/go/bin/seraph at 18:52, `seraph install` rewrote ~/.omp/agent/hooks/seraph-gate.ts, and the installed file now carries sessionOf/stampSession. get_task was exercised end to end over MCP stdio with the new binary and returned TASK-122's full body, where the old binary answered with the Scan error.]
+> **Done when:** 5. Verified live under omp: a claim taken without an explicit session id is honoured by the gate while other tasks remain unclaimed. [MET on the substance, with the boundary named. A driver drove the INSTALLED module under bun against the real gate and the real board: the session holding the claim (omp-20261009T1119Z-main-01a12063) ran a bash call and was ALLOWED while 1 task was still unclaimed — the exact refusal the old hook produced — and a different session was refused with the usual message. The 'without an explicit session id' half is the input-rewrite path of criterion 2, verified separately: the hook injects that id into the payload, so the agent never types it. What could not be witnessed is a NEW omp session loading the new hook, because this session loaded the old hook at start; the installed file is the one the next session loads.]
+> **Done when:** 6. gofmt -l, go vet ./... and go test ./... all clean. [MET: gofmt -l empty, go vet clean, go test ./... -count=1 green across board, db, doctor, gate, installer, mcp and tui.]
+> **Done when:** 7. Done through the board with the claim held by the session that did the work. [MET: claimed and set done by session omp-20261009T1119Z-main-01a12063.]
+> **Done when:** WHAT WAS NOT DONE, AND WHY. The running session kept the old hook, so its own bash remained refused until the board held no unclaimed task — that is the pre-fix behaviour still in effect for this session and it is expected: omp loads hooks at start. The fix is proven against the installed file, which is what the next session loads.
+
+> Both defects were found while landing TASK-123, and both are recorded there as left open.
+> THE IDENTITY GAP. omp starts the seraph MCP server with no SERAPH_SESSION_ID in its environment (verified: 82 env vars on the server process, none of them a session id), and the generated omp hook sends session_id: process.env.SERAPH_SESSION_ID ?? "" — an empty string. The gate therefore cannot attribute a claim to the session that made it. Observed live: every bash and edit in this session was refused with 'this session holds no task ... N task(s) are unclaimed' until the board held zero unclaimed tasks, at which point someClaimExists let it through. That is the TASK-112 disagreement, still open for omp.
+> THE CHANNEL THAT FIXES IT. ctx.sessionManager in a tool_call hook is a ReadonlySessionManager with getSessionId(): string — the harness's own session identity, which the hook can read even though it cannot set the MCP server's environment. The hook can also revise the input a tool runs with (ToolCallEventResult.input), so it can write that id into the agent's own claim/update/release payloads. One source of truth for both sides.
+> THE STALE BINARY. ~/go/bin/seraph (what omp spawns) was built before TASK-124, so get_task still answers with the Scan error through MCP even though the source is fixed at 61bc363.
 
 ### TASK-105 · Document seraph gate, seraph hook and seraph version in USING.md
 
