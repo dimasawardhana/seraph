@@ -62,14 +62,20 @@ var hookTargets = []struct {
 		Doc:  "docs.github.com copilot hooks-reference — preToolUse; fails OPEN on timeout only",
 	},
 	{
-		// omp discovers hooks in ~/.omp/agent/hooks/, and in .claude/hooks/{pre,post} and
-		// ~/.codex/hooks imported from other tools. It has no project hook directory at
-		// all — the earlier ".omp/hooks/pre/" path was ours, not omp's, so the file that
-		// install wrote there was never loaded by anything. See the package's own
-		// examples/hooks/README.md, which says where to put one.
-		Name: "omp", Home: ".omp",
-		Path:    "agent/hooks/seraph-gate.ts",
-		Doc:     "examples/hooks/permission-gate.ts in @oh-my-pi/pi-coding-agent — default-exported HookAPI, pi.on(\"tool_call\") returning {block:true}; discovered only in ~/.omp/agent/hooks/",
+		// omp discovers hooks by walking up from the working directory to a ".omp" root and
+		// reading hooks/{pre,post}, and separately from the Claude Code layout
+		// ($CLAUDE_CONFIG_DIR or ~/.claude, plus the repo, at hooks/{pre,post}). It does NOT
+		// read ~/.omp/agent/hooks.
+		//
+		// TASK-114 moved this target to ~/.omp/agent/hooks/ on a reading of the packaged
+		// README, and that was wrong: the shipped bundle contains no "agent/hooks" string at
+		// all, and a probe hook written there never fires. Measured on omp 18.0.3 — a file at
+		// <root>/.omp/hooks/pre/seraph-gate.ts fires, one at ~/.omp/agent/hooks/ does not. So
+		// the path this target had before TASK-114 was the right one, and the gate TASK-114
+		// claimed to have relocated was in fact moved somewhere omp never reads.
+		Name: "omp", Project: true,
+		Path:    ".omp/hooks/pre/seraph-gate.ts",
+		Doc:     "omp walks up to .omp/hooks/{pre,post} and reads $CLAUDE_CONFIG_DIR|~/.claude/hooks/{pre,post}; default-exported handler at pi.on(\"tool_call\") returning {block:true}",
 		Version: []string{"omp", "--version"},
 	},
 	{
@@ -419,7 +425,8 @@ func installedBy(harness, raw string) bool {
 // Two details are load-bearing and both were wrong before. The module imports HookAPI from
 // the package root and default-exports a plain function taking it: ExtensionFactory belongs
 // to the EXTENSIONS subsystem and does not resolve here. And it must land in
-// ~/.omp/agent/hooks/, the only native directory omp reads — see the omp target above.
+// <root>/.omp/hooks/pre/, the directory omp walks up to — see the omp target above for how
+// that was established and for the TASK-114 relocation that put it somewhere omp never reads.
 //
 // A third was missing. The hook sent an empty session id, because omp starts the seraph
 // server with no SERAPH_SESSION_ID in its environment and the agent cannot know the id the

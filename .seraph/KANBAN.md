@@ -2,6 +2,53 @@
 
 _Written by Seraph. Do not edit — this file is replaced on every change._
 
+## Backlog
+
+### TASK-130 · The omp gate is written to a directory omp never reads
+
+> **Goal:** TASK-114 moved install's omp gate to ~/.omp/agent/hooks/ on a misreading of the packaged README, but omp 18.0.3 never looks there — so `seraph hook` reports an installed gate that would not have fired, and the only reason writes were ever gated is that a stale copy from the OLD path was still on disk.
+- priority: high
+- triage: ready-for-agent
+- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T13:00:38Z)
+- updated: 2026-10-09T12:30:38Z
+references:
+  - internal/installer/hooks.go
+
+> **Done when:** 1. Hooks are written to a directory omp actually discovers, established by observation, not by reading a README.
+> **Done when:** 2. A fresh omp session loads the gate: a write is refused when it should be, and allowed when the session holds the claim.
+> **Done when:** 3. The old location is not left as a live gate file, and the code's comments no longer assert the wrong path.
+> **Done when:** 4. gofmt -l, go vet ./... and go test ./... all clean.
+> **Done when:** 5. Done through the board with the claim held by the session that did the work.
+
+> Found while testing the TASK-126 identity fix in a fresh omp session.
+> WHAT OMP 18.0.3 ACTUALLY DOES (measured, not read): probe hooks were written to four candidate directories and a real omp -p session was run for each. Only these fired: <repo>/.omp/hooks/pre/, <repo>/.claude/hooks/pre/, ~/.claude/hooks/pre/. These did NOT fire: ~/.omp/agent/hooks/ (where TASK-114 put the gate) and ~/.omp/hooks/pre/. The shipped bundle contains no "agent/hooks" string at all — the path is the README's, not the code's (bundle: `function Ntr(e){return{project:join(e.cwd,".omp"),user:Jt()}}` and a walk-up that adds `.omp/<pre|post>` at each ancestor; the .claude provider resolves `$CLAUDE_CONFIG_DIR|~/.claude`).
+> WHY IT MATTERED AND WAS NOT NOTICED. TASK-114 rewrote install to the ~/.omp/agent/hooks/ path, but the OLD file at <repo>/.omp/hooks/pre/seraph-gate.ts was still on disk and still loaded — so the gate kept firing and the new location's uselessness was invisible. That stale file also sent an empty session id, which is the identity bug TASK-126 fixed: the fix was written into a file omp never read.
+> THE FIX. The omp target is Project:true, Path '.omp/hooks/pre/seraph-gate.ts' — the path it had before TASK-114. Verified end to end: a fresh omp 18.0.3 headless session claimed a task under a deliberately wrong session id (the hook rewrote it to the real one), then ran a shell command while another task sat unclaimed — and was ALLOWED, creating the file. Under the old hook the same write was refused.
+> The dead gate seraph had written to ~/.omp/agent/hooks/seraph-gate.ts was removed, since a stale hook on disk is exactly what hid this defect.
+
+### TASK-128 · NEWSESSION-TEST-A: the task a fresh session will claim
+
+> **Goal:** Distractor task pair for proving the rebuilt omp hook gives a fresh session the session identity the gate reads, so its writes are honoured while another task remains unclaimed.
+- priority: low
+- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T13:00:38Z)
+- updated: 2026-10-09T12:30:38Z
+
+> **Done when:** 1. Used only to demonstrate the identity fix; closed after the run.
+
+> Test fixture. Safe to complete.
+
+### TASK-129 · NEWSESSION-TEST-B: the distractor that stays unclaimed
+
+> **Goal:** The second half of the fixture: this task must stay unclaimed so that a fresh session holding a claim still faces an unclaimed task, which is the condition under which the old hook refused every write.
+- priority: low
+- claimed by: omp (session `omp-20261009T1119Z-main-01a12063`, until 2026-10-09T13:00:38Z)
+- updated: 2026-10-09T12:30:38Z
+
+> **Done when:** 1. Left unclaimed through the run; closed afterwards.
+
+> Test fixture. Safe to complete.
+
+
 ## Done
 
 ### TASK-101 · Sync ROADMAP.md with shipped scope
