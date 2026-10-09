@@ -88,7 +88,7 @@ repository   /home/you/myproject
 marker       .git
 database     /home/you/myproject/.seraph/state.db
 journal      wal
-schema       v1 (this build expects v1)
+schema       v3 (this build expects v3)
 tasks        0
 KANBAN.md    absent — any tool call writes it
 board.json   absent — any tool call writes it

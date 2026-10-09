@@ -59,11 +59,9 @@ func Run(_ context.Context, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	schema := fmt.Sprintf("v%d (this build expects v%d)", applied, db.SchemaVersion)
-	if applied != db.SchemaVersion {
-		schema += " — MISMATCH"
-	}
-	field(w, "schema", schema)
+	// db.Open has already refused a database this build does not understand, so by here the
+	// two versions agree; printing both is what makes that visible rather than assumed.
+	field(w, "schema", fmt.Sprintf("v%d (this build expects v%d)", applied, db.SchemaVersion))
 
 	var tasks int
 	if err := handle.QueryRow("SELECT count(*) FROM tasks").Scan(&tasks); err != nil {
@@ -88,9 +86,6 @@ func Run(_ context.Context, w io.Writer) error {
 
 	reportHarnesses(w, root)
 
-	if applied != db.SchemaVersion {
-		return errors.New("schema version mismatch")
-	}
 	return nil
 }
 

@@ -81,30 +81,52 @@ func holderText(i dashboard.Item) string {
 	}
 }
 
-func idText(i dashboard.Item) string {
+// idText styles an id that has already been cut to its column. Taking the shown text
+// rather than the Item keeps the cut on the plain string, where it cannot land inside an
+// escape sequence.
+func idText(i dashboard.Item, shown string) string {
 	switch i.Priority {
 	case "urgent":
-		return held.Render(i.ID)
+		return held.Render(shown)
 	case "high":
-		return caution.Render(i.ID)
+		return caution.Render(shown)
 	default:
-		return faint.Render(i.ID)
+		return faint.Render(shown)
 	}
 }
 
-// columns sizes the row from the real terminal width, so a narrow window drops a column
-// rather than letting one wrap.
+// rowChrome is everything in a row that is not a sized column: the two-column selection
+// marker, the one-column status dot, and the five single spaces between the six fields.
+const rowChrome = 2 + 1 + 5
+
+// columns sizes the row from the real terminal width. The returned widths sum to exactly
+// width - rowChrome, which is what keeps a row inside the terminal — a row that wraps
+// becomes two lines in a panel that has already laid out its height, and pushes the board
+// off the top. The priority column is dropped first, then the holder, so the title keeps as
+// much room as the window allows.
+//
+// The sum is a budget, not a guarantee: every caller must clamp its field to the width it
+// was given. An id is padded to nine columns but a five-digit task number is wider than
+// that, so the row must cut it like any other field rather than let it push the row over.
 func columns(width int) (id, prio, title, holder int) {
-	id, prio, holder = 9, 8, 18
-	title = width - id - prio - holder - 12
-	if title < 14 {
-		title = 14
-	}
-	if width < 68 {
+	const (
+		idW, prioW, holderW = 9, 8, 18
+		// preferTitle is the title room that must remain before a column is dropped. It is
+		// a threshold for dropping, not the floor: below it the layout keeps whatever is
+		// left, down to one column.
+		preferTitle = 12
+	)
+	free := width - rowChrome
+	id, prio, holder = idW, prioW, holderW
+	if id+prio+holder+preferTitle > free {
 		prio = 0
 	}
-	if width < 46 {
+	if id+holder+preferTitle > free {
 		holder = 0
+	}
+	title = free - id - prio - holder
+	if title < 1 {
+		title = 1
 	}
 	return
 }
@@ -120,7 +142,7 @@ func (m *model) row(item dashboard.Item, isSelected bool, width int) string {
 
 	id := ""
 	if idw > 0 {
-		id = padRight(idText(item), idw)
+		id = padRight(idText(item, cut(item.ID, idw)), idw)
 	}
 
 	// Pad the rendered run, not the source word: substituting a glyph for "urgent"

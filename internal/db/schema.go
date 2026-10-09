@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"seraph/internal/vocab"
@@ -11,8 +12,17 @@ import (
 // add a new entry to migrations below; never edit a released one.
 const SchemaVersion = 3
 
+// ErrNewerSchema is returned when a database records a version this build does not
+// understand. It must be an error rather than a quiet pass: one of the reasons ADR-0004
+// refuses to build on codegraph is that it misreads a newer store instead of failing, and
+// seraph reading a v4 board with a v3 binary would be the same defect one level down.
+var ErrNewerSchema = errors.New("database schema is newer than this build")
+
 // createTasks is the v1 shape plus every column added since, so a brand-new database is
-// correct in one pass and never has to be altered.
+// correct in one pass and never has to be altered. The added columns — goal, acceptance,
+// doc_refs — stand LAST, in the order the migrations ALTER them on, so a fresh board and a
+// migrated one agree on column order too and TestMigratedAndFreshBoardsAgreeOnTaskShape can
+// compare table_info strictly.
 //
 // The claim is identified by (claim_harness, claim_session) alone. An earlier draft also
 // carried a per-claim token that release would have to present, but that token would have
@@ -28,9 +38,7 @@ var createTasks = []string{
 	`CREATE TABLE IF NOT EXISTS tasks (
 		id            TEXT PRIMARY KEY,
 		title         TEXT    NOT NULL,
-		goal          TEXT,
 		description   TEXT,
-		acceptance    TEXT,
 		status        TEXT    NOT NULL DEFAULT '` + vocab.Default(vocab.Statuses) + `'
 		              CHECK (status IN (` + vocab.Quoted(vocab.Statuses) + `)),
 		triage        TEXT
@@ -38,15 +46,17 @@ var createTasks = []string{
 		priority      TEXT    NOT NULL DEFAULT '` + vocab.Default(vocab.Priorities) + `'
 		              CHECK (priority IN (` + vocab.Quoted(vocab.Priorities) + `)),
 		claim_harness TEXT,
-		-- Named doc_refs, not references: REFERENCES is a SQLite keyword, so the natural
-		-- column name has to be quoted in every statement that touches it. The domain
-		-- word stays "references" everywhere a human reads it.
-		doc_refs    TEXT,
 		claim_session TEXT,
 		claim_expires INTEGER,
 		metadata      TEXT,
 		created_at    INTEGER NOT NULL,
-		updated_at    INTEGER NOT NULL
+		updated_at    INTEGER NOT NULL,
+		goal          TEXT,
+		acceptance    TEXT,
+		-- Named doc_refs, not references: REFERENCES is a SQLite keyword, so the natural
+		-- column name has to be quoted in every statement that touches it. The domain
+		-- word stays "references" everywhere a human reads it.
+		doc_refs      TEXT
 	)`,
 	`CREATE TABLE IF NOT EXISTS id_sequence (
 		id   INTEGER PRIMARY KEY CHECK (id = 1),
@@ -61,7 +71,9 @@ var createTasks = []string{
 // One shared "upgrade" list could not survive a second version: raising SchemaVersion would
 // have re-run the v1-to-v2 ALTERs against a board that already had those columns, and every
 // existing repository would have failed to open. Keying by version is what makes adding a
-// column an ordinary change instead of a trap.
+// column an ordinary change instead of a trap — and Migrate refuses to run when a version in
+// the gap has no entry, because an absent or empty entry would otherwise append nothing and
+// still record the newer version as applied.
 var migrations = map[int][]string{
 	1: {
 		`ALTER TABLE tasks ADD COLUMN goal TEXT`,
@@ -81,7 +93,11 @@ func Migrate(handle *sql.DB) error {
 	if err := handle.QueryRow("PRAGMA user_version").Scan(&current); err != nil {
 		return fmt.Errorf("read schema version: %w", err)
 	}
-	if current >= SchemaVersion {
+	if current > SchemaVersion {
+		return fmt.Errorf("%w: database at v%d, this build at v%d; upgrade seraph",
+			ErrNewerSchema, current, SchemaVersion)
+	}
+	if current == SchemaVersion {
 		return nil
 	}
 
@@ -95,7 +111,12 @@ func Migrate(handle *sql.DB) error {
 	if current >= 1 {
 		statements = nil
 		for version := current; version < SchemaVersion; version++ {
-			statements = append(statements, migrations[version]...)
+			steps := migrations[version]
+			if len(steps) == 0 {
+				return fmt.Errorf("no migration from v%d to v%d: add migrations[%d]",
+					version, version+1, version)
+			}
+			statements = append(statements, steps...)
 		}
 	}
 	for i, statement := range statements {

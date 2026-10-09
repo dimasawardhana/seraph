@@ -1,6 +1,10 @@
 package tui
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // A compose is three answers, asked in the order that keeps them useful: what it is
 // called, what it is for, and how anyone will know it was done. The terminal asks for all
@@ -54,26 +58,50 @@ func (c *compose) retreat() {
 	}
 }
 
-// line renders the prompt plus what has been entered so far, so the earlier answers stay
-// on screen and can be corrected with one keystroke rather than retyped.
-func (c *compose) line() string {
-	var b strings.Builder
+// lines renders each prompt as one row, clamped to the terminal width. A typed answer that
+// runs past the edge would wrap exactly as a board row would, and the panel has no height
+// left to give — so the field scrolls under the cursor instead, keeping the end of what is
+// being typed visible. The clamp is unconditional: when the terminal is narrower than the
+// prompt itself, the label is dropped and the value alone is shown, still clamped.
+func (c *compose) lines(width int) []string {
+	out := make([]string, 0, len(prompts))
 	for i, p := range prompts {
 		marker := "  "
 		if i == c.at {
 			marker = cursor.Render("▸ ")
 		}
-		b.WriteString(marker)
-		if c.fields[i] == "" && i != c.at {
-			b.WriteString(faint.Render(p + ": —"))
-		} else if c.fields[i] == "" {
-			b.WriteString(faint.Render(p + ": "))
-		} else {
-			b.WriteString(txt.Render(p + ": " + c.fields[i]))
+		label := p + ": "
+		value := c.fields[i]
+		empty := value == ""
+		if empty && i != c.at {
+			value = "—"
 		}
-		b.WriteString("\n")
+		room := width - lipgloss.Width(marker) - lipgloss.Width(label)
+		if room < 0 {
+			room = 0
+		}
+		runes := []rune(value)
+		if len(runes) > room {
+			value = string(runes[len(runes)-room:])
+		}
+		style := txt
+		if empty {
+			style = faint
+		}
+		line := marker + style.Render(label+value)
+		if got := lipgloss.Width(line); got > width {
+			keep := width
+			if keep > len(runes) {
+				keep = len(runes)
+			}
+			if keep < 0 {
+				keep = 0
+			}
+			line = style.Render(string(runes[len(runes)-keep:]))
+		}
+		out = append(out, line)
 	}
-	return b.String()
+	return out
 }
 
 func (c *compose) submit() (title, goal, acceptance string, ok bool) {

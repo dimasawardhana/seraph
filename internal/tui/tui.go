@@ -24,6 +24,7 @@ const (
 	home     = "\x1b[H"
 	clearEOL = "\x1b[K"
 	clearScr = "\x1b[2J"
+	crlf     = "\r\n"
 )
 
 type model struct {
@@ -207,15 +208,39 @@ func errText(err error) string {
 	return err.Error()
 }
 
-// draw repaints the panel. It moves the cursor home and rewrites each line in place
-// rather than clearing the screen, because a full clear every second flickers hard enough
-// to be unpleasant on a second monitor. Only the first paint clears.
+// draw paints the panel once.
 func (m *model) draw() {
 	width, height := size()
+	fmt.Print(m.frame(width, height))
+}
+
+// frame builds one repaint. It moves the cursor home and rewrites each line in place
+// rather than clearing the screen, because a full clear every second flickers hard enough
+// to be unpleasant on a second monitor. Only the first paint clears.
+//
+// Every line ends in \r\n, never a bare \n. Run puts the terminal in raw mode, which turns
+// off the ONLCR translation that would otherwise return the carriage for us — so a bare \n
+// leaves the cursor in the column it was already in, and each line begins further right
+// than the one above it until the board walks off the right edge and wraps.
+func (m *model) frame(width, height int) string {
 	lines, cursor := m.lines(width)
-	pad := height - 5
+
+	// The bottom of the panel is a fixed-height block, so the board rows above it keep their
+	// place whether or not the compose prompts are open. Everything here is cleared and
+	// rewritten every paint; a line this panel does not account for is a line it never
+	// blanks, and the previous frame stays on screen underneath it.
+	compose := []string{}
 	if m.compose != nil {
-		pad -= 3
+		compose = m.compose.lines(width)
+	}
+	message := ""
+	if m.message != "" {
+		message = "  " + m.message
+	}
+
+	pad := height - 3 - len(compose)
+	if message != "" {
+		pad--
 	}
 	if pad < 1 {
 		pad = 1
@@ -244,20 +269,17 @@ func (m *model) draw() {
 		if i < len(shown) {
 			text = shown[i]
 		}
-		b.WriteString(text + clearEOL + "\n")
+		b.WriteString(text + clearEOL + crlf)
 	}
 
-	bottom := ""
-	if m.compose != nil {
-		bottom = m.compose.line()
-	} else if m.message != "" {
-		bottom = "  " + m.message
+	for _, line := range compose {
+		b.WriteString(line + clearEOL + crlf)
 	}
-	b.WriteString(bottom + clearEOL + "\n")
+	b.WriteString(message + clearEOL + crlf)
 	b.WriteString(faint.Render(keymap(width)) + clearEOL)
 
 	m.drawn++
-	fmt.Print(b.String())
+	return b.String()
 }
 
 func (m *model) lines(width int) ([]string, int) {
