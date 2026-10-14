@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"seraph/internal/board"
+
 	_ "modernc.org/sqlite"
 )
 
@@ -114,7 +116,19 @@ func Evaluate(harness, root, tool, session string, toolInput any) Verdict {
 	}
 
 	if c.held != "" {
-		return Verdict{Gate: Decision{Allow: true, Task: c.held}, Reason: "session already holds " + c.held}
+		// This call is the liveness signal. A session working steadily through a long
+		// task touches the board only at claim and close, so a 30-minute TTL expired
+		// under it mid-work and the gate re-locked it out of the files it was editing.
+		// Every gate-passing write or exec now extends the holder's claim, so an active
+		// session never lapses and a dead one still does — the renewal fires only on
+		// this branch, which only a live claim reaches.
+		if err := renewClaim(root, session, c.held); err != nil {
+			// Best-effort. The write is allowed either way; a failed renewal costs the
+			// session its old TTL, not its work.
+			return Verdict{Gate: Decision{Allow: true, Task: c.held},
+				Reason: "session already holds " + c.held + " (renewal failed: " + err.Error() + ")"}
+		}
+		return Verdict{Gate: Decision{Allow: true, Task: c.held}, Reason: "session already holds " + c.held + "; claim renewed"}
 	}
 	if session == "" && len(c.unclaimed) == 0 && someClaimExists(root) {
 		// Someone holds a claim but the hook cannot attribute it. Refusing here would be
@@ -290,4 +304,31 @@ func someClaimExists(root string) bool {
 		return false
 	}
 	return n > 0
+}
+
+// renewClaim extends the live claim session holds on taskID by the standard TTL.
+// The guard in the WHERE clause is the expired-claim rule: if the claim lapsed between
+// the read above and this write, the UPDATE matches nothing and nothing is renewed —
+// an expired claim takes no renewal from a race it lost.
+func renewClaim(root, session, taskID string) error {
+	path := filepath.Join(root, ".seraph", "state.db")
+	if _, err := os.Stat(path); err != nil {
+		return err
+	}
+	handle, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(2000)")
+	if err != nil {
+		return err
+	}
+	defer handle.Close()
+	expires := time.Now().UTC().Unix() + int64(board.ClaimTTL.Seconds())
+	res, err := handle.Exec(`UPDATE tasks SET claim_expires = ?
+	                          WHERE id = ? AND claim_session = ? AND claim_expires > ?`,
+		expires, taskID, session, time.Now().UTC().Unix())
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("claim on %s no longer live; nothing renewed", taskID)
+	}
+	return nil
 }

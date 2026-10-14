@@ -13,8 +13,16 @@ type Snapshot struct {
 
 func New(tasks []Task) Snapshot { return Snapshot{Tasks: tasks} }
 
-const header = "# Board\n\n" +
-	"_Written by Seraph. Do not edit — this file is replaced on every change._\n"
+// RenderFormat identifies the byte shape of a rendered snapshot. It changes only when the
+// render itself changes meaning (e.g. TASK-134's compaction), never for content. A reader
+// — doctor comparing an on-disk snapshot against a fresh render — can then tell a
+// snapshot written by a different build from a genuinely stale one, which is the
+// distinction TASK-136 found doctor unable to make.
+const RenderFormat = 3
+
+var header = "# Board\n\n" +
+	"_Written by Seraph. Do not edit — this file is replaced on every change._\n" +
+	fmt.Sprintf("_Render format %d._\n", RenderFormat)
 
 // MarkdownOpts narrows a render. The zero value renders every open task in full and every
 // closed task compactly, which is what the committed artifacts carry.
@@ -167,7 +175,8 @@ func splitLines(s string) []string {
 }
 
 type boardJSON struct {
-	Tasks []taskJSON `json:"tasks"`
+	RenderFormat int        `json:"render_format"`
+	Tasks        []taskJSON `json:"tasks"`
 }
 
 type taskJSON struct {
@@ -203,7 +212,7 @@ func encodeJSON(v any) ([]byte, error) {
 }
 
 func (s Snapshot) JSON() ([]byte, error) {
-	out := boardJSON{Tasks: make([]taskJSON, 0, len(s.Tasks))}
+	out := boardJSON{RenderFormat: RenderFormat, Tasks: make([]taskJSON, 0, len(s.Tasks))}
 	for _, t := range s.Tasks {
 		out.Tasks = append(out.Tasks, taskToJSON(t))
 	}

@@ -2,12 +2,12 @@ package gate
 
 import (
 	"path/filepath"
+	"seraph/internal/board"
+	"seraph/internal/db"
+	"seraph/internal/repo"
 	"strings"
 	"testing"
 	"time"
-
-	"seraph/internal/db"
-	"seraph/internal/repo"
 )
 
 // The repository had no tests until this file, which meant every claim about gate
@@ -212,5 +212,92 @@ func TestDeclaredToolsAreGated(t *testing.T) {
 	}
 	if got := Evaluate("", root, "some.unknown.mcp.tool", "", nil); !got.Gate.Allow {
 		t.Errorf("an unknown tool on an unknown harness must stay allowed: %s", got.Gate.Reason)
+	}
+}
+
+// A claim whose TTL lapsed mid-work used to re-lock an active session out of the files
+// it was editing. A gate-passing write is now the liveness signal: it extends the
+// holder's claim. These pin the three sides of that contract.
+
+// A passing write must extend the claim, or the renewal is decoration.
+func TestGatePassingWriteRenewsTheClaim(t *testing.T) {
+	root := newBoard(t, task{id: "TASK-1", session: "s1",
+		expires: time.Now().Add(time.Minute).Unix()})
+
+	got := Evaluate("", root, "Write", "s1", nil)
+	if !got.Gate.Allow {
+		t.Fatalf("expected allow, got refusal: %s", got.Gate.Reason)
+	}
+	if !strings.Contains(got.Reason, "renewed") {
+		t.Fatalf("expected a renewal in the reason, got %q", got.Reason)
+	}
+
+	handle, err := db.Open(repo.Root{Path: root, Marker: repo.StateDir})
+	if err != nil {
+		t.Fatalf("open board: %v", err)
+	}
+	defer handle.Close()
+	var expires int64
+	if err := handle.QueryRow(
+		`SELECT claim_expires FROM tasks WHERE id = 'TASK-1'`).Scan(&expires); err != nil {
+		t.Fatalf("read claim: %v", err)
+	}
+	if expires < time.Now().Add(board.ClaimTTL-time.Minute).Unix() {
+		t.Fatalf("claim not extended to a full TTL; expires %d", expires)
+	}
+}
+
+// An expired claim must take nothing from the renewal: it was already refused as
+// unclaimed before the write that would have renewed it ever ran.
+func TestExpiredClaimIsRefusedAndRenewsNothing(t *testing.T) {
+	expires := time.Now().Add(-time.Minute).Unix()
+	root := newBoard(t, task{id: "TASK-1", session: "s1", expires: expires})
+
+	got := Evaluate("", root, "Write", "s1", nil)
+	if got.Gate.Allow {
+		t.Fatal("expected refusal for an expired claim")
+	}
+
+	handle, err := db.Open(repo.Root{Path: root, Marker: repo.StateDir})
+	if err != nil {
+		t.Fatalf("open board: %v", err)
+	}
+	defer handle.Close()
+	var still int64
+	if err := handle.QueryRow(
+		`SELECT claim_expires FROM tasks WHERE id = 'TASK-1'`).Scan(&still); err != nil {
+		t.Fatalf("read claim: %v", err)
+	}
+	if still != expires {
+		t.Fatalf("expired claim changed: was %d, now %d", expires, still)
+	}
+}
+
+// No session id, no renewal — there is nothing to attribute the extension to.
+func TestNoSessionIdRenewsNothing(t *testing.T) {
+	expires := time.Now().Add(time.Minute).Unix()
+	root := newBoard(t,
+		task{id: "TASK-1", session: "s1", expires: expires},
+		task{id: "TASK-2", session: "s2", expires: expires})
+
+	got := Evaluate("", root, "Write", "", nil)
+	if !got.Gate.Allow {
+		t.Fatalf("expected the unattributable-claim allow, got refusal: %s", got.Gate.Reason)
+	}
+
+	handle, err := db.Open(repo.Root{Path: root, Marker: repo.StateDir})
+	if err != nil {
+		t.Fatalf("open board: %v", err)
+	}
+	defer handle.Close()
+	for _, row := range []task{{id: "TASK-1", expires: expires}, {id: "TASK-2", expires: expires}} {
+		var still int64
+		if err := handle.QueryRow(
+			`SELECT claim_expires FROM tasks WHERE id = ?`, row.id).Scan(&still); err != nil {
+			t.Fatalf("read claim on %s: %v", row.id, err)
+		}
+		if still != row.expires {
+			t.Fatalf("%s renewed without a session: was %d, now %d", row.id, row.expires, still)
+		}
 	}
 }

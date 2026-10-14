@@ -4,31 +4,14 @@ _Written by Seraph. Do not edit — this file is replaced on every change._
 
 ## Backlog
 
-### TASK-146 · Commit the TASK-133 gate fix and TASK-145 docs pass
+### TASK-149 · Commit and push the TASK-148 skew watcher and TASK-136 render-format work
 
-> **Goal:** The gate's declared-tools fix (internal/gate, internal/installer, internal/gate/command.go) and the USING.md declared-tool bullet sit uncommitted from the TASK-133/145 work, so a clone gets the gate that allowed omp's eval/task/hub unclaimed; land source, tests, docs and the re-rendered snapshots in one commit.
-- priority: high
-- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T09:33:25Z)
-- updated: 2026-10-14T09:03:25Z
-
-> **Done when:** When done, one commit contains internal/gate (gate.go, command.go, gate_test.go), internal/installer (hooks.go and any declaration wiring), docs/USING.md's new bullet, and the re-rendered board snapshots; `go test ./...` is green in the commit message's claim; the working tree is clean afterward.
-
-### TASK-136 · A long-lived seraph server keeps the binary it started with, so a fix reaches a session only at restart
-
-> **Goal:** A seraph serve process renders with whatever binary it was started from, so a rebuilt binary does not reach an already-running session — observed here when this session's server kept returning the full 149 KB board after the fix had been installed — and because doctor compares the on-disk snapshots against a render by the running binary, two sessions on different builds see the same 'DIFFERS' a genuinely stale snapshot produces; this records the observation accurately and leaves the decision about doctor's output to a human.
+> **Goal:** The build-skew work (internal/skew watcher, serve stderr report; board.RenderFormat stamped into snapshots; doctor naming skew vs staleness) and its tests are green and verified but uncommitted, so a clone gets a tree whose serve cannot name a rebuild and whose doctor cannot tell skew from staleness; land source, tests and re-rendered snapshots in one commit and push.
 - priority: medium
-- triage: ready-for-human
-- updated: 2026-10-14T04:10:16Z
-references:
-  - internal/doctor/doctor.go
+- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T10:37:03Z)
+- updated: 2026-10-14T10:07:03Z
 
-> **Done when:** 1. The record states the observed fact with evidence. [PARTLY WRONG AS FIRST WRITTEN, CORRECTED 2026-10-14 after re-checking the machine. The original text claimed 'four seraph processes on this machine, the oldest from 2026-10-12'. That came from a system-wide `ps -eo pid,lstart,etime,cmd` filtered on the string 'seraph', and was read as though all four were this repository's servers. That was never verified and is almost certainly false: nothing in the output tied any of them to this repository, and a per-process check now finds exactly ONE process whose cmdline is a bare `seraph` and whose cwd is this repository.
-> **Done when:**   WHAT IS ACTUALLY ESTABLISHED, and it is the substance of the task: this session's MCP server answered with the FULL board (149,330 bytes, committed as 47a93b3) after ~/go/bin/seraph had already been rebuilt from the fix at 01:53:31Z. A serve process renders with its start-time binary, so a rebuild does not reach a running session.
-> **Done when:**   WHAT HAS SINCE CHANGED, so this is not a live condition: the server restarted. pid 32215, started 2026-10-14T04:06:52Z, exe /home/dimasajiwardhana/go/bin/seraph with no '(deleted)' marker; a `get_board_summary` through it now returns the compact board and writes KANBAN.md at 19,773 bytes. The stale-render window was real and is closed. The mechanism is 'a server holds its start-time binary', NOT 'servers never pick up a rebuild'.
-> **Done when:**   AND THOSE FOUR PIDS NO LONGER EXIST. Whatever they were, an unverified count must not stand in a record as evidence — the defect this project keeps finding in itself.]
-> **Done when:** 2. It is decided whether doctor's snapshot-freshness comparison should ignore a difference caused by a stale binary, or name the build so a reader can tell the two causes apart. [STILL OPEN, and it is why this is triage ready-for-human rather than ready-for-agent. doctor.snapshotState renders with the running binary and byte-compares against the file, so build skew between two sessions is indistinguishable from a genuinely stale snapshot. A CONCRETE INSTANCE now exists: the TASK-134 fix changes the rendered bytes, so any session still on the old build will report 'DIFFERS' for a board that is in fact current — and the reverse, a session on the new build reading a board the old build wrote, does the same. Recording which build a session runs would separate the two causes; whether that belongs in doctor's output is a product call.]
-> **Done when:** 3. If any code change follows, tests pin it and gofmt/vet/test are green. [NOT YET APPLICABLE: no code change under this task.]
-> **Done when:** SO THE HONEST STATE: a narrower claim than first written, the wrong number removed, the transient window recorded as transient, the unverified count withdrawn, and the open design question left open.
+> **Done when:** When done, one commit contains internal/skew, the serve wiring, the RenderFormat stamp, the doctor skew/staleness distinction, their tests and the re-rendered board snapshots; pushed to origin; go test ./... green on the committed tree; working tree clean.
 
 
 ## Done
@@ -153,6 +136,18 @@ references:
 - priority: high
 - updated: 2026-10-14T07:22:49Z
 
+### TASK-146 · Commit the TASK-133 gate fix and TASK-145 docs pass
+
+> **Goal:** The gate's declared-tools fix (internal/gate, internal/installer, internal/gate/command.go) and the USING.md declared-tool bullet sit uncommitted from the TASK-133/145 work, so a clone gets the gate that allowed omp's eval/task/hub unclaimed; land source, tests, docs and the re-rendered snapshots in one commit.
+- priority: high
+- updated: 2026-10-14T09:03:49Z
+
+### TASK-147 · Gated writes renew the holder's claim TTL
+
+> **Goal:** A session working steadily through a long task gets re-locked out mid-work when its claim expires, because nothing touches the claim between board calls; each gated write that passes should refresh the holder's claim expiry so liveness at the gate is the renewal signal.
+- priority: high
+- updated: 2026-10-14T09:14:29Z
+
 ### TASK-105 · Document seraph gate, seraph hook and seraph version in USING.md
 
 > **Goal:** docs/USING.md documents install, doctor, board and ui, but never the three commands that make the claim gate usable: `seraph gate`, `seraph hook` and `seraph version`. A reader who wants to know whether their harness can enforce claims is told nothing.
@@ -225,6 +220,12 @@ references:
 - priority: medium
 - updated: 2026-10-09T11:37:17Z
 
+### TASK-136 · A long-lived seraph server keeps the binary it started with, so a fix reaches a session only at restart
+
+> **Goal:** A seraph serve process renders with whatever binary it was started from, so a rebuilt binary does not reach an already-running session — observed here when this session's server kept returning the full 149 KB board after the fix had been installed — and because doctor compares the on-disk snapshots against a render by the running binary, two sessions on different builds see the same 'DIFFERS' a genuinely stale snapshot produces; this records the observation accurately and leaves the decision about doctor's output to a human.
+- priority: medium
+- updated: 2026-10-14T10:03:58Z
+
 ### TASK-138 · Kanban surfaces show every status column, empty ones included
 
 > **Goal:** The webui and TUI currently drop any status with no tasks, so a dispatcher reading the board sees only Backlog and Done and has nowhere to move work to; rendering all five status columns makes the board read as the track diagram DESIGN.md describes.
@@ -272,6 +273,12 @@ references:
 > **Goal:** docs/USING.md's gate section still describes only the built-in vocabularies and implies exhaustive coverage, so a reader does not learn that a harness's unknown-named write tools are gated only because install declared them, and that MCP tools mounted under unfamiliar names still pass — the honest limit TASK-133 fixed around.
 - priority: medium
 - updated: 2026-10-14T09:02:57Z
+
+### TASK-148 · serve detects a rebuilt binary and says so
+
+> **Goal:** A long-lived seraph serve process renders with its start-time binary, so a rebuilt binary reaches a running session only at manual restart (TASK-136's observation); serve should detect that its on-disk executable changed after startup and say so, so the skew is named rather than invisible.
+- priority: medium
+- updated: 2026-10-14T09:25:38Z
 
 ### TASK-125 · Commit the board snapshots after TASK-123 and TASK-124
 

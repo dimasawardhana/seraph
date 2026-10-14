@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"seraph/internal/board"
 	"seraph/internal/db"
 	"seraph/internal/repo"
-	"sort"
 )
 
 func Run(_ context.Context, w io.Writer) error {
@@ -113,8 +115,33 @@ func snapshotState(handle *sql.DB, r repo.Root, name string) string {
 	if bytes.Equal(onDisk, current) {
 		return fmt.Sprintf("%d bytes, %s ago, current", len(onDisk), age)
 	}
-	return fmt.Sprintf("%d bytes, %s ago, DIFFERS from the board — any tool call rewrites it",
-		len(onDisk), age)
+	if diskFormat, ok := snapshotFormat(name, onDisk); ok && diskFormat != board.RenderFormat {
+		return fmt.Sprintf("%d bytes, %s ago, DIFFERS — the file is render format %d, this binary renders format %d; a build skew, so a restart, not a rewrite, is what is stale", len(onDisk), age, diskFormat, board.RenderFormat)
+	}
+	return fmt.Sprintf("%d bytes, %s ago, DIFFERS from the board — any tool call rewrites it", len(onDisk), age)
+}
+
+// snapshotFormat reads the render format recorded in an on-disk snapshot: the
+// `_Render format N._` line in the markdown header, or the top-level render_format field
+// of the JSON. A snapshot with no recorded format predates the field entirely, and its
+// format is unknown — reported as a plain difference rather than guessed at.
+func snapshotFormat(name string, data []byte) (int, bool) {
+	if name == board.JSONFile {
+		var parsed struct {
+			RenderFormat int `json:"render_format"`
+		}
+		if err := json.Unmarshal(data, &parsed); err != nil || parsed.RenderFormat == 0 {
+			return 0, false
+		}
+		return parsed.RenderFormat, true
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		var format int
+		if _, err := fmt.Sscanf(line, "_Render format %d._", &format); err == nil && format >= 1 {
+			return format, true
+		}
+	}
+	return 0, false
 }
 
 // missingReferences names every reference on the board whose file is not there.

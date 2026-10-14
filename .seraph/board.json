@@ -1,34 +1,19 @@
 {
   "tasks": [
     {
-      "id": "TASK-146",
-      "title": "Commit the TASK-133 gate fix and TASK-145 docs pass",
-      "goal": "The gate's declared-tools fix (internal/gate, internal/installer, internal/gate/command.go) and the USING.md declared-tool bullet sit uncommitted from the TASK-133/145 work, so a clone gets the gate that allowed omp's eval/task/hub unclaimed; land source, tests, docs and the re-rendered snapshots in one commit.",
-      "acceptance": "When done, one commit contains internal/gate (gate.go, command.go, gate_test.go), internal/installer (hooks.go and any declaration wiring), docs/USING.md's new bullet, and the re-rendered board snapshots; `go test ./...` is green in the commit message's claim; the working tree is clean afterward.",
+      "id": "TASK-149",
+      "title": "Commit and push the TASK-148 skew watcher and TASK-136 render-format work",
+      "goal": "The build-skew work (internal/skew watcher, serve stderr report; board.RenderFormat stamped into snapshots; doctor naming skew vs staleness) and its tests are green and verified but uncommitted, so a clone gets a tree whose serve cannot name a rebuild and whose doctor cannot tell skew from staleness; land source, tests and re-rendered snapshots in one commit and push.",
+      "acceptance": "When done, one commit contains internal/skew, the serve wiring, the RenderFormat stamp, the doctor skew/staleness distinction, their tests and the re-rendered board snapshots; pushed to origin; go test ./... green on the committed tree; working tree clean.",
       "status": "backlog",
-      "priority": "high",
+      "priority": "medium",
       "claim": {
         "harness": "omp",
         "session": "01a13584-f4a2-7089-9bea-7b1325675c55",
-        "expires": "2026-10-14T09:33:25Z"
+        "expires": "2026-10-14T10:37:03Z"
       },
-      "created_at": "2026-10-14T09:03:20Z",
-      "updated_at": "2026-10-14T09:03:25Z"
-    },
-    {
-      "id": "TASK-136",
-      "title": "A long-lived seraph server keeps the binary it started with, so a fix reaches a session only at restart",
-      "goal": "A seraph serve process renders with whatever binary it was started from, so a rebuilt binary does not reach an already-running session — observed here when this session's server kept returning the full 149 KB board after the fix had been installed — and because doctor compares the on-disk snapshots against a render by the running binary, two sessions on different builds see the same 'DIFFERS' a genuinely stale snapshot produces; this records the observation accurately and leaves the decision about doctor's output to a human.",
-      "acceptance": "1. The record states the observed fact with evidence. [PARTLY WRONG AS FIRST WRITTEN, CORRECTED 2026-10-14 after re-checking the machine. The original text claimed 'four seraph processes on this machine, the oldest from 2026-10-12'. That came from a system-wide `ps -eo pid,lstart,etime,cmd` filtered on the string 'seraph', and was read as though all four were this repository's servers. That was never verified and is almost certainly false: nothing in the output tied any of them to this repository, and a per-process check now finds exactly ONE process whose cmdline is a bare `seraph` and whose cwd is this repository.\n  WHAT IS ACTUALLY ESTABLISHED, and it is the substance of the task: this session's MCP server answered with the FULL board (149,330 bytes, committed as 47a93b3) after ~/go/bin/seraph had already been rebuilt from the fix at 01:53:31Z. A serve process renders with its start-time binary, so a rebuild does not reach a running session.\n  WHAT HAS SINCE CHANGED, so this is not a live condition: the server restarted. pid 32215, started 2026-10-14T04:06:52Z, exe /home/dimasajiwardhana/go/bin/seraph with no '(deleted)' marker; a `get_board_summary` through it now returns the compact board and writes KANBAN.md at 19,773 bytes. The stale-render window was real and is closed. The mechanism is 'a server holds its start-time binary', NOT 'servers never pick up a rebuild'.\n  AND THOSE FOUR PIDS NO LONGER EXIST. Whatever they were, an unverified count must not stand in a record as evidence — the defect this project keeps finding in itself.]\n2. It is decided whether doctor's snapshot-freshness comparison should ignore a difference caused by a stale binary, or name the build so a reader can tell the two causes apart. [STILL OPEN, and it is why this is triage ready-for-human rather than ready-for-agent. doctor.snapshotState renders with the running binary and byte-compares against the file, so build skew between two sessions is indistinguishable from a genuinely stale snapshot. A CONCRETE INSTANCE now exists: the TASK-134 fix changes the rendered bytes, so any session still on the old build will report 'DIFFERS' for a board that is in fact current — and the reverse, a session on the new build reading a board the old build wrote, does the same. Recording which build a session runs would separate the two causes; whether that belongs in doctor's output is a product call.]\n3. If any code change follows, tests pin it and gofmt/vet/test are green. [NOT YET APPLICABLE: no code change under this task.]\n\nSO THE HONEST STATE: a narrower claim than first written, the wrong number removed, the transient window recorded as transient, the unverified count withdrawn, and the open design question left open.",
-      "status": "backlog",
-      "triage": "ready-for-human",
-      "priority": "medium",
-      "references": [
-        "internal/doctor/doctor.go"
-      ],
-      "claim": null,
-      "created_at": "2026-10-14T01:55:43Z",
-      "updated_at": "2026-10-14T04:10:16Z"
+      "created_at": "2026-10-14T10:06:54Z",
+      "updated_at": "2026-10-14T10:07:03Z"
     },
     {
       "id": "TASK-101",
@@ -314,6 +299,32 @@
       "updated_at": "2026-10-14T07:22:49Z"
     },
     {
+      "id": "TASK-146",
+      "title": "Commit the TASK-133 gate fix and TASK-145 docs pass",
+      "goal": "The gate's declared-tools fix (internal/gate, internal/installer, internal/gate/command.go) and the USING.md declared-tool bullet sit uncommitted from the TASK-133/145 work, so a clone gets the gate that allowed omp's eval/task/hub unclaimed; land source, tests, docs and the re-rendered snapshots in one commit.",
+      "acceptance": "Done. One commit, 52cca92, contains internal/gate/{gate.go,command.go,gate_test.go}, internal/installer/hooks.go, docs/USING.md's declared-tool bullet, and the re-rendered board snapshots (7 files, +151/-75). gofmt clean, go vet ./... clean, go test ./... all green before the commit. Working tree clean afterward (git status empty).",
+      "status": "done",
+      "priority": "high",
+      "claim": null,
+      "created_at": "2026-10-14T09:03:20Z",
+      "updated_at": "2026-10-14T09:03:49Z"
+    },
+    {
+      "id": "TASK-147",
+      "title": "Gated writes renew the holder's claim TTL",
+      "goal": "A session working steadily through a long task gets re-locked out mid-work when its claim expires, because nothing touches the claim between board calls; each gated write that passes should refresh the holder's claim expiry so liveness at the gate is the renewal signal.",
+      "acceptance": "When done, a gate-passing write (write or exec tool, live claim held by the calling session) extends that claim's expires by the standard TTL in the same gate pass; a session whose claim expired is still refused and takes nothing; a no-session-id call renews nothing.\n\n*Done when:* 1. Gate-passing write renews. [met: Evaluate now calls renewClaim on the held branch; renewClaim UPDATEs claim_expires to now+TTL guarded by `claim_session = ? AND claim_expires > ?`, so a claim that lapsed between the read and the write takes nothing; TestGatePassingWriteRenewsTheClaim pins expiry >= now+TTL-1min]\n*Done when:* 2. Expired claim refused, renews nothing. [met: an expired claim is sorted into unclaimed by liveClaims, so it never reaches the renewal branch; TestExpiredClaimIsRefusedAndRenewsNothing pins the stored expires byte-identical after the refusal]\n*Done when:* 3. No session id renews nothing. [met: c.held is only set on sess == session, which is never true for \"\"; TestNoSessionIdRenewsNothing pins both unattributed tasks' expiries unchanged]\n*Done when:* 4. go test ./... green. [met: 2026-10-14, gate 13/13 including the three new tests, full suite ok]\nVERIFIED 2026-10-14, live probe against the rebuilt gate binary: {\"tool_name\":\"edit\"} with the holding session id returned block:false, reason \"session already holds TASK-147; claim renewed\", and the stored claim_expires moved to a full TTL from the probe time. RESIDUAL, recorded not hidden: the long-running MCP server still runs the pre-fix binary (TASK-136's exact observation), so board-tool writes renew nothing until that server restarts; hook-gated writes through the fresh gate binary do renew. Renewal is best-effort: a failed renewal allows the write with the failure named in the gate's reason, costing the session its old TTL rather than its work.]",
+      "status": "done",
+      "priority": "high",
+      "references": [
+        "internal/gate/gate.go",
+        "internal/board/lifecycle.go"
+      ],
+      "claim": null,
+      "created_at": "2026-10-14T09:10:43Z",
+      "updated_at": "2026-10-14T09:14:29Z"
+    },
+    {
       "id": "TASK-105",
       "title": "Document seraph gate, seraph hook and seraph version in USING.md",
       "goal": "docs/USING.md documents install, doctor, board and ui, but never the three commands that make the claim gate usable: `seraph gate`, `seraph hook` and `seraph version`. A reader who wants to know whether their harness can enforce claims is told nothing.",
@@ -462,6 +473,21 @@
       "updated_at": "2026-10-09T11:37:17Z"
     },
     {
+      "id": "TASK-136",
+      "title": "A long-lived seraph server keeps the binary it started with, so a fix reaches a session only at restart",
+      "goal": "A seraph serve process renders with whatever binary it was started from, so a rebuilt binary does not reach an already-running session — observed here when this session's server kept returning the full 149 KB board after the fix had been installed — and because doctor compares the on-disk snapshots against a render by the running binary, two sessions on different builds see the same 'DIFFERS' a genuinely stale snapshot produces; this records the observation accurately and leaves the decision about doctor's output to a human.",
+      "acceptance": "1. The record states the observed fact with evidence. [met, corrected 2026-10-14: the substance is that this session's MCP server answered with the FULL board after ~/go/bin/seraph had been rebuilt; a serve process renders with its start-time binary. The original 'four seraph processes' claim was unverified and is withdrawn.]\n2. It is decided whether doctor's snapshot-freshness comparison should ignore a difference caused by a stale binary, or name the build so a reader can tell the two causes apart. [DECIDED: name the build — option 2, chosen by the user this session. Render format is now a recorded fact, not an inference: board.RenderFormat (currently 3) is stamped into every snapshot — a '_Render format N._' line in the markdown header and a top-level render_format field in board.json. doctor.snapshotState byte-compares as before; when the bytes differ AND the on-disk format differs from the running binary's, it reports 'DIFFERS — the file is render format N, this binary renders format M; a build skew, so a restart, not a rewrite, is what is stale' instead of 'any tool call rewrites it'. A snapshot with no recorded format predates the field and is reported as a plain difference — an honest unknown, not a guess.]\n3. If any code change follows, tests pin it and gofmt/vet/test are green. [met: internal/doctor/doctor_test.go gains TestSnapshotStateNamesBuildSkewAsSkew, TestSnapshotStateNamesFormatlessDifferenceAsStale, TestSnapshotStateIsCurrentWhenBytesMatch; go vet + go test ./... all ok 2026-10-14.]\nVERIFIED live against this repository's real board: (a) a snapshot carrying format 2 while this binary renders 3 produced 'KANBAN.md ... DIFFERS — the file is render format 2, this binary renders format 3; a build skew, so a restart, not a rewrite, is what is stale'; (b) the committed formatless snapshot produced the plain 'DIFFERS from the board — any tool call rewrites it'. Both paths exercised through the real doctor binary. NOTE for whoever commits next: the first tool call after this lands re-renders .seraph/KANBAN.md and board.json with the format line, so the snapshots change once by design.]",
+      "status": "done",
+      "triage": "ready-for-human",
+      "priority": "medium",
+      "references": [
+        "internal/doctor/doctor.go"
+      ],
+      "claim": null,
+      "created_at": "2026-10-14T01:55:43Z",
+      "updated_at": "2026-10-14T10:03:58Z"
+    },
+    {
       "id": "TASK-138",
       "title": "Kanban surfaces show every status column, empty ones included",
       "goal": "The webui and TUI currently drop any status with no tasks, so a dispatcher reading the board sees only Backlog and Done and has nowhere to move work to; rendering all five status columns makes the board read as the track diagram DESIGN.md describes.",
@@ -548,6 +574,21 @@
       "claim": null,
       "created_at": "2026-10-14T09:02:07Z",
       "updated_at": "2026-10-14T09:02:57Z"
+    },
+    {
+      "id": "TASK-148",
+      "title": "serve detects a rebuilt binary and says so",
+      "goal": "A long-lived seraph serve process renders with its start-time binary, so a rebuilt binary reaches a running session only at manual restart (TASK-136's observation); serve should detect that its on-disk executable changed after startup and say so, so the skew is named rather than invisible.",
+      "acceptance": "When done, a serve process whose exe file changed after startup reports that fact in its own output, named as build skew rather than stale snapshot; the mechanism is pinned by a test; go test ./... green.\n\n*Done when:* 1. Detection mechanism. [met: new internal/skew — Capture() records the running executable's path, mtime and size at startup; Changed() re-stats and reports any difference, including a binary that vanished]\n*Done when:* 2. Serve reports it. [met: mcp.Serve captures at startup and polls Changed() every 30s; the report goes to stderr — stdout is the MCP protocol channel — once per detected change, so a long-lived server does not spam; a startup that cannot stat its own executable serves anyway with the watcher as the loss]\n*Done when:* 3. Named as build skew, not stale snapshot. [met: the message says 'on-disk binary ... changed since this server started ... a restart is needed to pick the rebuild up' — cause and remedy named; doctor's DIFFERS question (TASK-136 criterion 2) is untouched, that decision stays with a human]\n*Done when:* 4. Pinned by tests. [met: internal/skew/skew_test.go — unchanged binary reports nothing; rebuilt binary is detected with 'changed since this server started' and 'restart' in the message; vanished binary reported; mtime-only change (equal size) phrased without a bogus byte count]\n*Done when:* 5. go test ./... green. [met: 2026-10-14, all packages ok]\nVERIFIED 2026-10-14 against a real serve process: started with stdin held open, perturbed the binary's mtime under it, and the server wrote to stderr within one tick: 'seraph: on-disk binary /home/dimasajiwardhana/go/bin/seraph changed since this server started (its modification time changed); this session still renders with its start-time binary — a restart is needed to pick the rebuild up'. A first probe with no stdin produced no report because server.Run had already exited — the watcher is inside Serve, which is the right scope: no serving, nothing to report about.]",
+      "status": "done",
+      "priority": "medium",
+      "references": [
+        "internal/mcp/server.go",
+        "internal/doctor/doctor.go"
+      ],
+      "claim": null,
+      "created_at": "2026-10-14T09:10:50Z",
+      "updated_at": "2026-10-14T09:25:38Z"
     },
     {
       "id": "TASK-125",
