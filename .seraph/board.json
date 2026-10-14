@@ -16,6 +16,21 @@
       "updated_at": "2026-10-14T01:07:18Z"
     },
     {
+      "id": "TASK-136",
+      "title": "A long-lived seraph server keeps the binary it started with, so a fix reaches a session only at restart",
+      "goal": "seraph serve is spawned once per harness session and runs for its lifetime, so a rebuilt binary does not reach a running session; worse, doctor compares the on-disk snapshots against a fresh render by whichever binary is running, so two sessions on different builds report each other's snapshots as DIFFERS — surface which build a session is actually using.",
+      "acceptance": "1. The record states the observed fact with evidence: four seraph processes on this machine, the oldest from 2026-10-12, and a 2026-10-14 rebuild that this session's server did not pick up.\n2. It is decided whether doctor's snapshot-freshness comparison should ignore a difference caused by a stale binary, or name the build so a reader can tell the two causes apart.\n3. If any code change follows, tests pin it and gofmt/vet/test are green.",
+      "status": "backlog",
+      "triage": "ready-for-human",
+      "priority": "medium",
+      "references": [
+        "internal/doctor/doctor.go"
+      ],
+      "claim": null,
+      "created_at": "2026-10-14T01:55:43Z",
+      "updated_at": "2026-10-14T01:55:43Z"
+    },
+    {
       "id": "TASK-101",
       "title": "Sync ROADMAP.md with shipped scope",
       "goal": "ROADMAP.md describes v1 as six MCP tools, but internal/ also ships webui, dashboard, tui, vocab and gate. Either the roadmap records that scope as carried forward with the reason it is not in v1, or the scope line is corrected. The roadmap must not silently disagree with the tree.",

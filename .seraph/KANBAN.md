@@ -30,6 +30,19 @@ references:
 > **Done when:** THE DESIGN QUESTION, which is the reason this is recorded rather than fixed on sight. gate.go's default is allow-with-a-reason, and that is deliberate in two places: the no-session branch (gate.go:101-105) says 'Refusing here would be a guess, and a wrong guess is a deadlock', and the unreadable-board branch (gate.go:94-96) fails open so a database problem cannot freeze work. Inverting the default — refuse anything not recognised as a read — matches the principle the project keeps stating ('a hook file on disk is not evidence of anything'; TASK-113) but makes the gate depend on knowing every harness's tool names, which install cannot do for MCP-provided or renamed tools. The honest options are: (a) invert to refuse-unless-known-read, (b) keep allow-by-default but require the harness to declare its write tools at install, or (c) record it as an accepted limit and say so in docs/USING.md rather than implying the gate is exhaustive. Nothing in the current code or docs admits the limit exists.
 > **Done when:** SCOPE NOTE. The three omp names are what was probed; the defect is the classification strategy, not those three strings. Adding 'eval', 'task' and 'hub' to writeTools would close the observed instances and leave the class open, which is the mistake TASK-131 was about, one level up.
 
+### TASK-136 · A long-lived seraph server keeps the binary it started with, so a fix reaches a session only at restart
+
+> **Goal:** seraph serve is spawned once per harness session and runs for its lifetime, so a rebuilt binary does not reach a running session; worse, doctor compares the on-disk snapshots against a fresh render by whichever binary is running, so two sessions on different builds report each other's snapshots as DIFFERS — surface which build a session is actually using.
+- priority: medium
+- triage: ready-for-human
+- updated: 2026-10-14T01:55:43Z
+references:
+  - internal/doctor/doctor.go
+
+> **Done when:** 1. The record states the observed fact with evidence: four seraph processes on this machine, the oldest from 2026-10-12, and a 2026-10-14 rebuild that this session's server did not pick up.
+> **Done when:** 2. It is decided whether doctor's snapshot-freshness comparison should ignore a difference caused by a stale binary, or name the build so a reader can tell the two causes apart.
+> **Done when:** 3. If any code change follows, tests pin it and gofmt/vet/test are green.
+
 
 ## Done
 
