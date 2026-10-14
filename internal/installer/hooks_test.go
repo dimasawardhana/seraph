@@ -11,18 +11,33 @@ import (
 // "installed" used to mean only that a file Seraph wrote was still on disk, which is how a
 // harness that never reads that file came to read as covered.
 
-const claudeGate = `{
+// existingBinary is a path that is genuinely there, so a fixture describing a healthy hook
+// is not read as a dead one. The health report now asks whether the command a hook carries
+// would actually run, and a made-up path is indistinguishable from the defect it looks for.
+func existingBinary(t *testing.T) string {
+	t.Helper()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatalf("resolve this test binary: %v", err)
+	}
+	return exe
+}
+
+// gateFile renders a Claude-shaped settings.json whose gate runs binary.
+func gateFile(binary string) string {
+	return `{
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Write|Edit|Bash",
         "hooks": [
-          {"type": "command", "command": "/usr/bin/seraph gate --harness claude"}
+          {"type": "command", "command": "` + binary + ` gate --harness claude"}
         ]
       }
     ]
   }
 }`
+}
 
 // newRepo lays down a project root holding exactly the hook files a case needs, and points
 // $HOME at a scratch directory so user-scope targets cannot read this machine's real config.
@@ -61,7 +76,7 @@ func statusOf(t *testing.T, root, harness string) HookReport {
 }
 
 func TestAPresentGateFileDoesNotReadAsEnforcing(t *testing.T) {
-	root := newRepo(t, map[string]string{".claude/settings.json": claudeGate})
+	root := newRepo(t, map[string]string{".claude/settings.json": gateFile(existingBinary(t))})
 
 	got := statusOf(t, root, "Claude Code")
 
@@ -81,7 +96,7 @@ func TestAMissingFileReadsAsNotInstalled(t *testing.T) {
 // The state has to be reachable, or the honest answer is a dead end. Nothing grants it but
 // an entry recording a refusal somebody actually watched.
 func TestEnforcingRequiresARecordedRefusal(t *testing.T) {
-	root := newRepo(t, map[string]string{".claude/settings.json": claudeGate})
+	root := newRepo(t, map[string]string{".claude/settings.json": gateFile(existingBinary(t))})
 
 	if got := statusOf(t, root, "Claude Code"); strings.Contains(got.Status, "enforcing") {
 		t.Fatalf("precondition: %q already claims enforcement", got.Status)
@@ -186,5 +201,174 @@ func TestTheOmpHookCarriesTheHarnessSessionId(t *testing.T) {
 	// gate as missing the moment the template changed.
 	if !installedBy("omp", src) {
 		t.Error("the generated omp hook no longer satisfies installedBy, so `seraph hook` would regress")
+	}
+}
+
+// The three hooks install wrote on this machine pointed at /tmp/binp/seraph, which is gone.
+// `seraph hook` called them installed and re-running install could not repair them, so a
+// command that cannot run read exactly like coverage.
+func TestAHookPointingAtAMissingBinaryReadsAsUnrunnable(t *testing.T) {
+	root := newRepo(t, map[string]string{".claude/settings.json": gateFile("/nonexistent/binp/seraph")})
+
+	got := statusOf(t, root, "Claude Code")
+
+	if !strings.Contains(got.Status, "command missing") {
+		t.Fatalf("a hook whose binary is gone must not read as installed, got %q", got.Status)
+	}
+	if !strings.Contains(got.Detail, "/nonexistent/binp/seraph") {
+		t.Errorf("the report must name the path that does not run, got %q", got.Detail)
+	}
+}
+
+// A hook naming a bare command is resolved on PATH; one naming an absent command is dead.
+func TestABareCommandIsResolvedOnPath(t *testing.T) {
+	root := newRepo(t, map[string]string{".claude/settings.json": gateFile("definitely-not-a-real-binary-xyz")})
+
+	if got := statusOf(t, root, "Claude Code"); !strings.Contains(got.Status, "command missing") {
+		t.Errorf("a bare command that is not on PATH must read as unrunnable, got %q", got.Status)
+	}
+}
+
+// A moved binary is the same defect one step earlier: the hook is intact, the command it
+// carries is not. install must rewrite it rather than report unchanged.
+func TestInstallRepairsACommandPointingAtAnotherBinary(t *testing.T) {
+	root := newRepo(t, map[string]string{".claude/settings.json": gateFile("/nonexistent/binp/seraph")})
+
+	want := existingBinary(t)
+	if _, err := InstallHooks(root, want, false); err != nil {
+		t.Fatalf("InstallHooks: %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(root, ".claude/settings.json"))
+	if err != nil {
+		t.Fatalf("read the rewritten config: %v", err)
+	}
+	if !strings.Contains(string(raw), want) {
+		t.Errorf("install left the dead command in place:\n%s", raw)
+	}
+	if strings.Contains(string(raw), "/nonexistent/binp/seraph") {
+		t.Errorf("the dead path survived an install:\n%s", raw)
+	}
+	if got := statusOf(t, root, "Claude Code"); !strings.Contains(got.Status, "installed") {
+		t.Errorf("a repaired hook must read as installed, got %q", got.Status)
+	}
+}
+
+// Repair must be idempotent: a second install over a healthy entry changes nothing.
+func TestRepairIsIdempotent(t *testing.T) {
+	root := newRepo(t, map[string]string{".claude/settings.json": gateFile("/nonexistent/binp/seraph")})
+
+	want := existingBinary(t)
+	if _, err := InstallHooks(root, want, false); err != nil {
+		t.Fatalf("first InstallHooks: %v", err)
+	}
+	first, _ := os.ReadFile(filepath.Join(root, ".claude/settings.json"))
+
+	reports, err := InstallHooks(root, want, false)
+	if err != nil {
+		t.Fatalf("second InstallHooks: %v", err)
+	}
+	second, _ := os.ReadFile(filepath.Join(root, ".claude/settings.json"))
+
+	if string(first) != string(second) {
+		t.Errorf("a second install rewrote a healthy file:\n%s\n---\n%s", first, second)
+	}
+	for _, r := range reports {
+		if r.Name == "Claude Code" && r.Detail != "unchanged" {
+			t.Errorf("expected unchanged on the second pass, got %q", r.Detail)
+		}
+	}
+}
+
+// Gemini measures its hook timeout in milliseconds and names tools write_file/replace/
+// run_shell_command. The installed entry said 10, which is ten milliseconds — a hook killed
+// before it could answer — and carried Claude tool names, which Gemini never emits, so the
+// matcher could not fire.
+func TestGeminiHookUsesMillisecondsAndGeminiToolNames(t *testing.T) {
+	root := newRepo(t, nil)
+
+	if _, err := InstallHooks(root, existingBinary(t), false); err != nil {
+		t.Fatalf("InstallHooks: %v", err)
+	}
+	home, _ := os.UserHomeDir()
+	raw, err := os.ReadFile(filepath.Join(home, ".gemini", "settings.json"))
+	if err != nil {
+		t.Fatalf("read the Gemini config: %v", err)
+	}
+	body := string(raw)
+
+	if !strings.Contains(body, `"timeout": 10000`) {
+		t.Errorf("Gemini's timeout is milliseconds and must not be 10:\n%s", body)
+	}
+	if !strings.Contains(body, "run_shell_command") {
+		t.Errorf("the matcher must name a tool Gemini emits:\n%s", body)
+	}
+	if strings.Contains(body, "MultiEdit") || strings.Contains(body, "EditNotebook") {
+		t.Errorf("the Gemini matcher still carries Claude tool names:\n%s", body)
+	}
+	if !strings.Contains(body, "BeforeTool") {
+		t.Errorf("Gemini reads hooks under BeforeTool:\n%s", body)
+	}
+}
+
+// Cursor reads its own schema from .cursor/hooks.json: a camelCase preToolUse, a flat entry,
+// and a version. The PascalCase PreToolUse install used to write is Claude's shape, which
+// Cursor honours only from .claude/settings*.json, so the file said gated and gated nothing.
+func TestCursorHookIsWrittenInCursorsOwnSchema(t *testing.T) {
+	root := newRepo(t, nil)
+
+	if _, err := InstallHooks(root, existingBinary(t), false); err != nil {
+		t.Fatalf("InstallHooks: %v", err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, ".cursor", "hooks.json"))
+	if err != nil {
+		t.Fatalf("read the Cursor config: %v", err)
+	}
+	body := string(raw)
+
+	if !strings.Contains(body, `"version": 1`) {
+		t.Errorf("Cursor's schema requires a version:\n%s", body)
+	}
+	if !strings.Contains(body, `"preToolUse"`) {
+		t.Errorf("Cursor reads the camelCase event name:\n%s", body)
+	}
+	if strings.Contains(body, `"PreToolUse"`) {
+		t.Errorf("the Claude-shaped key must not be written into Cursor's own file:\n%s", body)
+	}
+	if !strings.Contains(body, `"matcher": "Shell|Write"`) {
+		t.Errorf("the matcher must name tools Cursor emits:\n%s", body)
+	}
+	if got := statusOf(t, root, "Cursor"); !strings.Contains(got.Status, "installed") {
+		t.Errorf("the Cursor hook must read as installed, got %q", got.Status)
+	}
+}
+
+// An earlier install left the gate under Claude's event name inside Cursor's file. That
+// entry is inert there, and Cursor does not read it — leaving it would keep a dead hook
+// claiming to be the gate.
+func TestCursorInstallRemovesTheClaudeShapedLeftover(t *testing.T) {
+	leftover := `{
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "Write|Edit", "hooks": [{"type": "command", "command": "/nonexistent/binp/seraph gate --harness cursor"}]}
+    ]
+  }
+}`
+	root := newRepo(t, map[string]string{".cursor/hooks.json": leftover})
+
+	if _, err := InstallHooks(root, existingBinary(t), false); err != nil {
+		t.Fatalf("InstallHooks: %v", err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, ".cursor", "hooks.json"))
+	if err != nil {
+		t.Fatalf("read the rewritten Cursor config: %v", err)
+	}
+	body := string(raw)
+
+	if strings.Contains(body, `"PreToolUse"`) {
+		t.Errorf("the inert Claude-shaped entry must be removed, not left beside the live one:\n%s", body)
+	}
+	if !strings.Contains(body, `"preToolUse"`) {
+		t.Errorf("the live entry must remain:\n%s", body)
 	}
 }

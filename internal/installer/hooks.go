@@ -278,11 +278,22 @@ func writeHook(harness, path, seraphBin string, dryRun bool) (string, string, er
 	case "openclaw", "Cline":
 		return "manual", "needs a plugin package — `seraph hook --explain` has the shape", nil
 
+	case "Cursor":
+		return writeCursorHook(path, existing, seraphBin, dryRun)
+
 	default:
 		return mergeJSONHook(harness, path, existing, seraphBin, dryRun)
 	}
 }
 
+// mergeJSONHook writes the gate into a JSON-config harness, updating the entry in place
+// when one is already there.
+//
+// The update is the point. This used to return "unchanged" the moment an entry mentioning
+// seraph was found, so a hook whose command named a binary that had since moved — or a
+// build that no longer exists — was reported as installed and never repaired. Three
+// harnesses on this machine pointed at /tmp/binp/seraph, which is gone, and re-running
+// install could not fix them.
 func mergeJSONHook(harness, path string, existing []byte, seraphBin string, dryRun bool) (string, string, error) {
 	doc := map[string]any{}
 	if len(existing) > 0 {
@@ -296,45 +307,39 @@ func mergeJSONHook(harness, path string, existing []byte, seraphBin string, dryR
 		hooks = map[string]any{}
 	}
 
-	switch harness {
-	case "Gemini CLI":
-		if hasGeminiGate(hooks) {
-			return "installed", "unchanged", nil
+	event := hookEvent(harness)
+	groups := list(hooks[event])
+
+	command := gateCommand(seraphBin, gateToken(harness))
+	matcher := matcherFor(harness)
+	timeout := timeoutFor(harness)
+
+	existingAt := gateEntry(groups)
+	if existingAt >= 0 {
+		if group, ok := groups[existingAt].(map[string]any); ok {
+			adoptGate(group, command, matcher, timeout)
 		}
-		hooks["BeforeTool"] = append(list(hooks["BeforeTool"]),
-			map[string]any{
-				"matcher": matcherFor(harness),
-				"hooks": []any{map[string]any{
-					"name":    "seraph-gate",
-					"type":    "command",
-					"command": gateCommand(seraphBin, "gemini"),
-					"timeout": 10,
-				}},
-			})
-	default:
-		if hasDefaultGate(hooks) {
-			return "installed", "unchanged", nil
-		}
-		hooks["PreToolUse"] = append(list(hooks["PreToolUse"]),
-			map[string]any{
-				"matcher": matcherFor(harness),
-				"hooks": []any{map[string]any{
-					"type":    "command",
-					"command": gateCommand(seraphBin, harness),
-				}},
-			})
+	} else {
+		groups = append(groups, newGate(harness, command, matcher, timeout))
 	}
+	hooks[event] = groups
 	doc["hooks"] = hooks
 
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return "refused", "", err
 	}
-	if string(out) == string(existing) {
+	// The file is written with a trailing newline and the re-marshal has none, so compare
+	// against the bytes as they would land. Without this every second install rewrote an
+	// identical file and reported it as a change.
+	if string(out) == strings.TrimSuffix(string(existing), "\n") {
 		return "installed", "unchanged", nil
 	}
 	if dryRun {
-		return "would install", "PreToolUse gate added", nil
+		if existingAt >= 0 {
+			return "would install", "gate command updated", nil
+		}
+		return "would install", "gate added to " + event, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "refused", "", err
@@ -342,25 +347,184 @@ func mergeJSONHook(harness, path string, existing []byte, seraphBin string, dryR
 	if err := os.WriteFile(path, append(out, '\n'), 0o644); err != nil {
 		return "refused", "", err
 	}
-	return "installed", "PreToolUse gate added", nil
+	if existingAt >= 0 {
+		return "installed", "gate command updated", nil
+	}
+	return "installed", "gate added to " + event, nil
 }
 
-// matcherFor covers the write tools and the shell. Leaving the shell out would make the
-// gate advisory with extra machinery: `bash -c 'echo x > file'` fires no Write hook.
+// writeCursorHook writes Cursor's own hooks.json schema.
+//
+// The shape install used to write — PascalCase PreToolUse in a {matcher, hooks:[...]} group
+// — is Claude Code's, and Cursor reads that only from .claude/settings*.json. Inside
+// .cursor/hooks.json it is inert: Cursor's own format takes a camelCase event name, one
+// flat entry per hook, and a version. So the file said "gated" and gated nothing. This
+// writes the format Cursor's reference documents, and drops the Claude-shaped entry an
+// earlier install left under the wrong key.
+func writeCursorHook(path string, existing []byte, seraphBin string, dryRun bool) (string, string, error) {
+	doc := map[string]any{}
+	if len(existing) > 0 {
+		if err := json.Unmarshal(existing, &doc); err != nil {
+			return "refused", "", fmt.Errorf("exists but is not valid JSON (%v) — left untouched", err)
+		}
+	}
+
+	hooks, _ := doc["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = map[string]any{}
+	}
+
+	// An earlier install wrote the gate under Claude's event name, which Cursor does not
+	// read here. Leaving it would keep a second, dead entry claiming to be the gate.
+	if stale, ok := hooks["PreToolUse"].([]any); ok {
+		kept := make([]any, 0, len(stale))
+		for _, e := range stale {
+			if !mentionsSeraph(e) {
+				kept = append(kept, e)
+			}
+		}
+		if len(kept) == 0 {
+			delete(hooks, "PreToolUse")
+		} else {
+			hooks["PreToolUse"] = kept
+		}
+	}
+
+	entries := list(hooks["preToolUse"])
+	entry := map[string]any{"command": gateCommand(seraphBin, "cursor"), "matcher": matcherFor("Cursor")}
+
+	at := -1
+	for i, e := range entries {
+		cfg, ok := e.(map[string]any)
+		if !ok || !mentionsSeraph(cfg) {
+			continue
+		}
+		at = i
+		for k, v := range cfg {
+			if k != "command" && k != "matcher" {
+				entry[k] = v // keep anything Cursor added that is not ours to own
+			}
+		}
+		break
+	}
+	if at >= 0 {
+		entries[at] = entry
+	} else {
+		entries = append(entries, entry)
+	}
+	hooks["preToolUse"] = entries
+	doc["hooks"] = hooks
+	if _, ok := doc["version"]; !ok {
+		doc["version"] = 1
+	}
+
+	out, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return "refused", "", err
+	}
+	if string(out) == strings.TrimSuffix(string(existing), "\n") {
+		return "installed", "unchanged", nil
+	}
+	if dryRun {
+		return "would install", "Cursor-native preToolUse gate", nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "refused", "", err
+	}
+	if err := os.WriteFile(path, append(out, '\n'), 0o644); err != nil {
+		return "refused", "", err
+	}
+	return "installed", "Cursor-native preToolUse gate", nil
+}
+
+// gateEntry finds the group install already wrote for a harness.
+func gateEntry(groups []any) int {
+	for i, g := range groups {
+		if mentionsSeraph(g) {
+			return i
+		}
+	}
+	return -1
+}
+
+// newGate is the entry install writes when the harness has none.
+func newGate(harness, command, matcher string, timeout int) map[string]any {
+	cfg := map[string]any{"type": "command", "command": command}
+	if harness == "Gemini CLI" {
+		cfg["name"] = "seraph-gate"
+	}
+	if timeout > 0 {
+		cfg["timeout"] = timeout
+	}
+	return map[string]any{"matcher": matcher, "hooks": []any{cfg}}
+}
+
+// adoptGate repairs an entry install wrote before: the command, the matcher that decides
+// when it fires, and the timeout where the harness measures one. The group is edited rather
+// than replaced, so a hook a user added beside ours keeps its place.
+func adoptGate(group map[string]any, command, matcher string, timeout int) {
+	group["matcher"] = matcher
+	for _, h := range list(group["hooks"]) {
+		cfg, ok := h.(map[string]any)
+		if !ok || !mentionsSeraph(cfg) {
+			continue
+		}
+		cfg["command"] = command
+		if timeout > 0 {
+			cfg["timeout"] = timeout
+		}
+	}
+}
+
+// hookEvent is the key each harness reads hooks under. Gemini names the pre-tool event
+// BeforeTool; every other JSON target install writes takes Claude's PreToolUse.
+func hookEvent(harness string) string {
+	if harness == "Gemini CLI" {
+		return "BeforeTool"
+	}
+	return "PreToolUse"
+}
+
+// timeoutFor is the hook timeout in the unit the harness measures, or 0 to leave it out.
+// Gemini's field is milliseconds, so the 10 this used to write was ten milliseconds — a
+// hook killed before it could answer. Cursor's unit is not established here, so it is left
+// to the harness's own default rather than guessed at.
+func timeoutFor(harness string) int {
+	if harness == "Gemini CLI" {
+		return 10000
+	}
+	return 0
+}
+
+// matcherFor covers the write tools and the shell, in the names each harness actually
+// emits. Leaving the shell out makes the gate advisory with extra machinery, and a matcher
+// written in another harness's vocabulary matches nothing at all — which is how the Cursor
+// and Gemini entries came to be installed and inert at once.
+//
+// Claude Code, Codex and Copilot CLI share the Claude tool names. Gemini names tools
+// write_file/replace/run_shell_command and matches them as a regex. Cursor matches Shell
+// and Write. Kiro needs no entry: it is Unsupported and never reaches this function.
 func matcherFor(harness string) string {
 	switch harness {
-	case "Kiro":
-		return "write|edit|patch|bash|terminal|execute|run_command"
-	case "omp":
-		return "*"
+	case "Gemini CLI":
+		return "write_file|replace|run_shell_command"
+	case "Cursor":
+		return "Shell|Write"
 	default:
 		return "Write|Edit|MultiEdit|NotebookEdit|apply_patch|Bash|EditNotebook|BashOutput"
 	}
 }
 
-func gateCommand(seraphBin, harness string) string {
-	name := strings.ToLower(strings.ReplaceAll(harness, " ", ""))
-	return fmt.Sprintf("%s gate --harness %s", quote(seraphBin), name)
+// gateToken is the name the gate is told to answer for, which selects its output shape.
+func gateToken(harness string) string {
+	if harness == "Gemini CLI" {
+		return "gemini"
+	}
+	return strings.ToLower(strings.ReplaceAll(harness, " ", ""))
+}
+
+func gateCommand(seraphBin, token string) string {
+	return fmt.Sprintf("%s gate --harness %s", quote(seraphBin), token)
 }
 
 func quote(path string) string {
@@ -377,27 +541,105 @@ func list(v any) []any {
 	return []any{}
 }
 
-func hasDefaultGate(hooks map[string]any) bool {
-	for _, entry := range list(hooks["PreToolUse"]) {
-		if mentionsSeraph(entry) {
-			return true
+// storedCommand reads back the gate command a hook file already carries, so the health
+// report can ask whether it is still a command that runs. It understands the two shapes
+// install writes: a command string inside a JSON entry, and omp's GATE constant.
+func storedCommand(harness, raw string) string {
+	if harness == "omp" {
+		for _, line := range strings.Split(raw, "\n") {
+			if !strings.HasPrefix(strings.TrimSpace(line), "const GATE =") {
+				continue
+			}
+			_, value, ok := strings.Cut(line, "=")
+			if !ok {
+				return ""
+			}
+			if unquoted, err := strconv.Unquote(strings.TrimSuffix(strings.TrimSpace(value), ";")); err == nil {
+				return unquoted
+			}
+			return ""
+		}
+		return ""
+	}
+
+	doc := map[string]any{}
+	if err := json.Unmarshal([]byte(raw), &doc); err != nil {
+		return ""
+	}
+	hooks, _ := doc["hooks"].(map[string]any)
+	for _, event := range []string{"preToolUse", "PreToolUse", "BeforeTool"} {
+		for _, g := range list(hooks[event]) {
+			group, ok := g.(map[string]any)
+			if !ok {
+				continue
+			}
+			if cmd, ok := group["command"].(string); ok && mentionsSeraph(group) {
+				return cmd // Cursor's flat entry
+			}
+			for _, h := range list(group["hooks"]) {
+				cfg, ok := h.(map[string]any)
+				if !ok || !mentionsSeraph(cfg) {
+					continue
+				}
+				if cmd, ok := cfg["command"].(string); ok {
+					return cmd
+				}
+			}
 		}
 	}
-	return false
+	return ""
 }
 
-func hasGeminiGate(hooks map[string]any) bool {
-	for _, entry := range list(hooks["BeforeTool"]) {
-		if mentionsSeraph(entry) {
-			return true
-		}
+// commandBinary is the executable a hook command runs: its first word, honouring the
+// quoting install writes around a path that holds a space.
+func commandBinary(command string) string {
+	command = strings.TrimSpace(command)
+	if command == "" {
+		return ""
 	}
-	return false
+	if command[0] == '"' {
+		if end := strings.IndexByte(command[1:], '"'); end >= 0 {
+			return command[1 : end+1]
+		}
+		return ""
+	}
+	if i := strings.IndexAny(command, " \t"); i >= 0 {
+		return command[:i]
+	}
+	return command
 }
+
+// binaryMissing names the executable a hook would fail to run, or "" when it is there. A
+// bare name is resolved on PATH, which is what install writes when seraph was not found
+// while installing. A hook pointing at nothing reads exactly like coverage, which is the
+// defect this whole report exists to catch.
+func binaryMissing(binary string) string {
+	if binary == "" {
+		return ""
+	}
+	if strings.ContainsRune(binary, os.PathSeparator) {
+		if _, err := os.Stat(binary); err != nil {
+			return binary
+		}
+		return ""
+	}
+	if _, err := exec.LookPath(binary); err != nil {
+		return binary
+	}
+	return ""
+}
+
+// gateSignature is what every entry install writes carries and a coincidental string does
+// not: the gate subcommand with the harness flag. It is matched instead of the literal
+// "seraph gate", which only appears when the binary happens to be named seraph — so an
+// install run as a renamed binary could not see the entry it had just written and appended
+// a duplicate on every pass. A renamed or relocated seraph is the case this project keeps
+// meeting.
+const gateSignature = "gate --harness"
 
 func mentionsSeraph(v any) bool {
 	encoded, err := json.Marshal(v)
-	return err == nil && strings.Contains(string(encoded), "seraph gate")
+	return err == nil && strings.Contains(string(encoded), gateSignature)
 }
 
 // installedBy reports whether a target's file is the gate this package wrote.
@@ -566,7 +808,10 @@ func InspectHooks(root string) ([]HookReport, error) {
 				detail += "; a gate file written by an earlier install is still at " + path + " and is inert"
 			}
 		} else if raw, err := os.ReadFile(path); err == nil && installedBy(target.Name, string(raw)) {
-			if v, ok := verified[target.Name]; ok {
+			if dead := binaryMissing(commandBinary(storedCommand(target.Name, string(raw)))); dead != "" {
+				status = "installed, command missing"
+				detail = dead + " is not runnable; `seraph install` points this hook back at this build"
+			} else if v, ok := verified[target.Name]; ok {
 				status, detail = "enforcing (verified "+v.build+", "+v.date+")", v.note
 			} else {
 				status = "installed, unverified"
