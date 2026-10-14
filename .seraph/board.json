@@ -31,34 +31,19 @@
       "updated_at": "2026-10-14T04:10:16Z"
     },
     {
-      "id": "TASK-139",
-      "title": "Redesign the webui detail as a titled sidebar",
-      "goal": "When a dispatcher selects a card in the browser board the detail opens in the sidebar with a real header showing the task title, replacing the current cloned-detail treatment so the panel reads as a panel, not a card copy.",
-      "acceptance": "1. Clicking or keyboard-selecting a card shows its detail in the sidebar with the task title as a visible header. 2. Esc closes, selection moves keep the header in sync. 3. gofmt/vet/test green and verified in the browser on a rebuilt binary.",
+      "id": "TASK-144",
+      "title": "Commit the post-redesign board snapshot render",
+      "goal": "When done, the committed board snapshots equal the database's final render so a fresh clone sees the board as it stands after the webui redesign landed.",
+      "acceptance": "The re-rendered snapshots after TASK-139/143 closures are committed and pushed; git status -sb reports a clean tree with master matching origin/master.",
       "status": "backlog",
       "priority": "medium",
       "claim": {
         "harness": "omp",
         "session": "01a13584-f4a2-7089-9bea-7b1325675c55",
-        "expires": "2026-10-14T08:10:10Z"
+        "expires": "2026-10-14T09:10:45Z"
       },
-      "created_at": "2026-10-14T07:39:48Z",
-      "updated_at": "2026-10-14T07:40:10Z"
-    },
-    {
-      "id": "TASK-143",
-      "title": "Commit and push webui redesign and column ordering",
-      "goal": "When done, the shipped webui/modal redesign and the workflow-ordered kanban columns are landed in one commit and pushed, so the repository's committed board and tree match what was verified in the browser.",
-      "acceptance": "One commit carries the webui redesign and the workflow-ordered columns with the re-rendered snapshots; push succeeds and the remote matches HEAD.",
-      "status": "backlog",
-      "priority": "medium",
-      "claim": {
-        "harness": "omp",
-        "session": "01a13584-f4a2-7089-9bea-7b1325675c55",
-        "expires": "2026-10-14T09:08:58Z"
-      },
-      "created_at": "2026-10-14T08:38:07Z",
-      "updated_at": "2026-10-14T08:38:58Z"
+      "created_at": "2026-10-14T08:40:36Z",
+      "updated_at": "2026-10-14T08:40:45Z"
     },
     {
       "id": "TASK-101",
@@ -488,6 +473,17 @@
       "updated_at": "2026-10-14T04:51:46Z"
     },
     {
+      "id": "TASK-139",
+      "title": "Redesign the webui detail as a titled sidebar",
+      "goal": "When a dispatcher selects a card in the browser board the detail opens in the sidebar with a real header showing the task title, replacing the current cloned-detail treatment so the panel reads as a panel, not a card copy.",
+      "acceptance": "1. Clicking or keyboard-selecting a card shows its detail in the sidebar with the task title as a visible header. 2. Esc closes, selection moves keep the header in sync. 3. gofmt/vet/test green and verified in the browser on a rebuilt binary.",
+      "status": "done",
+      "priority": "medium",
+      "claim": null,
+      "created_at": "2026-10-14T07:39:48Z",
+      "updated_at": "2026-10-14T08:40:18Z"
+    },
+    {
       "id": "TASK-140",
       "title": "Webui: compose becomes modal, header rail becomes signal-head wordmark",
       "goal": "When done, dispatchers create tasks through a native modal dialog instead of a permanent compose strip, and the header rail carries a signal-head Seraph wordmark that reports board liveness at a glance.",
@@ -519,6 +515,17 @@
       "claim": null,
       "created_at": "2026-10-14T08:34:02Z",
       "updated_at": "2026-10-14T08:35:51Z"
+    },
+    {
+      "id": "TASK-143",
+      "title": "Commit and push webui redesign and column ordering",
+      "goal": "When done, the shipped webui/modal redesign and the workflow-ordered kanban columns are landed in one commit and pushed, so the repository's committed board and tree match what was verified in the browser.",
+      "acceptance": "One commit carries the webui redesign and the workflow-ordered columns with the re-rendered snapshots; push succeeds and the remote matches HEAD.",
+      "status": "done",
+      "priority": "medium",
+      "claim": null,
+      "created_at": "2026-10-14T08:38:07Z",
+      "updated_at": "2026-10-14T08:39:39Z"
     },
     {
       "id": "TASK-125",

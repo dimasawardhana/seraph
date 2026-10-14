@@ -50,23 +50,14 @@ references:
 > **Done when:** 3. If any code change follows, tests pin it and gofmt/vet/test are green. [NOT YET APPLICABLE: no code change under this task.]
 > **Done when:** SO THE HONEST STATE: a narrower claim than first written, the wrong number removed, the transient window recorded as transient, the unverified count withdrawn, and the open design question left open.
 
-### TASK-139 · Redesign the webui detail as a titled sidebar
+### TASK-144 · Commit the post-redesign board snapshot render
 
-> **Goal:** When a dispatcher selects a card in the browser board the detail opens in the sidebar with a real header showing the task title, replacing the current cloned-detail treatment so the panel reads as a panel, not a card copy.
+> **Goal:** When done, the committed board snapshots equal the database's final render so a fresh clone sees the board as it stands after the webui redesign landed.
 - priority: medium
-- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T08:10:10Z)
-- updated: 2026-10-14T07:40:10Z
+- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T09:10:45Z)
+- updated: 2026-10-14T08:40:45Z
 
-> **Done when:** 1. Clicking or keyboard-selecting a card shows its detail in the sidebar with the task title as a visible header. 2. Esc closes, selection moves keep the header in sync. 3. gofmt/vet/test green and verified in the browser on a rebuilt binary.
-
-### TASK-143 · Commit and push webui redesign and column ordering
-
-> **Goal:** When done, the shipped webui/modal redesign and the workflow-ordered kanban columns are landed in one commit and pushed, so the repository's committed board and tree match what was verified in the browser.
-- priority: medium
-- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T09:08:58Z)
-- updated: 2026-10-14T08:38:58Z
-
-> **Done when:** One commit carries the webui redesign and the workflow-ordered columns with the re-rendered snapshots; push succeeds and the remote matches HEAD.
+> **Done when:** The re-rendered snapshots after TASK-139/143 closures are committed and pushed; git status -sb reports a clean tree with master matching origin/master.
 
 
 ## Done
@@ -263,6 +254,12 @@ references:
 - priority: medium
 - updated: 2026-10-14T04:51:46Z
 
+### TASK-139 · Redesign the webui detail as a titled sidebar
+
+> **Goal:** When a dispatcher selects a card in the browser board the detail opens in the sidebar with a real header showing the task title, replacing the current cloned-detail treatment so the panel reads as a panel, not a card copy.
+- priority: medium
+- updated: 2026-10-14T08:40:18Z
+
 ### TASK-140 · Webui: compose becomes modal, header rail becomes signal-head wordmark
 
 > **Goal:** When done, dispatchers create tasks through a native modal dialog instead of a permanent compose strip, and the header rail carries a signal-head Seraph wordmark that reports board liveness at a glance.
@@ -280,6 +277,12 @@ references:
 > **Goal:** When done, the board reads left-to-right in workflow order — backlog, todo, in_progress, review, done — on the browser panel, the terminal board and every snapshot, instead of the current in_progress-first order.
 - priority: medium
 - updated: 2026-10-14T08:35:51Z
+
+### TASK-143 · Commit and push webui redesign and column ordering
+
+> **Goal:** When done, the shipped webui/modal redesign and the workflow-ordered kanban columns are landed in one commit and pushed, so the repository's committed board and tree match what was verified in the browser.
+- priority: medium
+- updated: 2026-10-14T08:39:39Z
 
 ### TASK-125 · Commit the board snapshots after TASK-123 and TASK-124
 
