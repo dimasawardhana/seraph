@@ -15,11 +15,11 @@
   var lastHash = null;
   var failures = 0;
 
-  function rows() { return Array.prototype.slice.call(host.querySelectorAll('.row')); }
+  function cards() { return Array.prototype.slice.call(host.querySelectorAll('.card')); }
 
   function visible() {
     var q = filter.value.trim().toLowerCase();
-    return rows().filter(function (r) {
+    return cards().filter(function (r) {
       if (!q) { r.hidden = false; return true; }
       var hit = (r.dataset.t || '').toLowerCase().indexOf(q) > -1;
       r.hidden = !hit;
@@ -30,7 +30,7 @@
   function mark() {
     var shown = visible();
     count.textContent = filter.value.trim()
-      ? shown.length + ' of ' + rows().length
+      ? shown.length + ' of ' + cards().length
       : '';
     shown.forEach(function (r, i) {
       r.dataset.sel = (i === sel) ? '1' : '0';
@@ -46,10 +46,7 @@
   }
 
   function current() {
-    /* Enter and the action keys must act on the row the user is actually on. Focusing a
-       row — by click, by Tab, or by a screen reader — moves the caret without moving the
-       selection index, so the focused row wins when there is one. */
-    if (document.activeElement && document.activeElement.classList.contains('row')) {
+    if (document.activeElement && document.activeElement.classList.contains('card')) {
       return document.activeElement;
     }
     return visible()[sel] || null;
@@ -58,9 +55,9 @@
   /* Fire the button that belongs to a key, so the keyboard path and the mouse path
      are literally the same request. */
   function act(key) {
-    var row = current();
-    if (!row) { return; }
-    var btn = row.querySelector('.acts button[data-k="' + key + '"]');
+    var card = current();
+    if (!card) { return; }
+    var btn = card.querySelector('.acts button[data-k="' + key + '"]');
     if (btn) { btn.form.submit(); }
   }
 
@@ -69,86 +66,124 @@
     helpOn.setAttribute('aria-expanded', String(open));
   }
 
+  /* The side panel is the detail view. It is a panel, not a card copy: its header
+     carries the signal, the id, the holder, and the title as its heading, and the
+     body renders the task's own .detail fields — cloned, so the poll can keep the
+     board fresh without touching what the user is reading. The in-card .detail
+     block stays hidden; it is the data source, never a shown surface. */
+  var side = document.getElementById('side');
 
+  function showDetail(card) {
+    var d = card.querySelector('.detail');
+    side.innerHTML = '';
+    side.className = 'side ' + (card.className.match(/aspect-[a-z]+/g) || []).join(' ');
+    side.dataset.task = card.dataset.task;
+    if (card.dataset.pri) { side.dataset.pri = card.dataset.pri; }
 
-  function toggleDetail() {
-    var row = current();
-    if (!row) { return; }
-    var d = row.querySelector('.detail');
-    if (d) { d.hidden = !d.hidden; }
+    var head = document.createElement('header');
+    head.className = 'side-head';
+    var meta = document.createElement('div');
+    meta.className = 'side-meta';
+    var sig = document.createElement('span');
+    sig.className = 'signal';
+    sig.setAttribute('aria-hidden', 'true');
+    var id = document.createElement('span');
+    id.className = 'side-id';
+    id.textContent = card.dataset.task;
+    meta.append(sig, id);
+    var holder = card.querySelector('.card-top .holder');
+    if (holder) { meta.appendChild(holder.cloneNode(true)); }
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'side-close';
+    close.textContent = 'esc';
+    close.setAttribute('aria-label', 'close detail');
+    close.addEventListener('click', function () { side.hidden = true; });
+    meta.appendChild(close);
+    var title = document.createElement('h2');
+    title.className = 'side-title';
+    title.textContent = card.querySelector('.card-title').textContent;
+    head.append(meta, title);
+
+    var body = document.createElement('div');
+    body.className = 'side-body';
+    if (d) { var cd = d.cloneNode(true); cd.hidden = false; body.appendChild(cd); }
+    side.append(head, body);
+    side.hidden = false;
   }
 
-  /* Focus is the selection. Anything that focuses a row adopts it, so the keys act on
-     the row the user is actually on. */
+  function toggleDetail() {
+    var card = current();
+    if (!card) { return; }
+    if (!side.hidden && side.dataset.task === card.dataset.task) {
+      side.hidden = true;
+      return;
+    }
+    showDetail(card);
+  }
+
+  /* Focus is the selection. Anything that focuses a card adopts it, so the keys act on
+     the card the user is actually on. */
   host.addEventListener('focusin', function (e) {
-    var row = e.target.closest('.row');
-    if (!row) { return; }
-    sel = Math.max(0, visible().indexOf(row));
-    mark();
+    var card = e.target.closest('.card');
+    if (!card) { return; }
+    sel = Math.max(0, visible().indexOf(card));
   });
+
+  /* A click on a card opens its detail in the side panel; clicking another card
+     moves it there. Buttons and forms inside the card keep their own behaviour. */
+  host.addEventListener('click', function (e) {
+    if (e.target.closest('button, a, input, form')) { return; }
+    var card = e.target.closest('.card');
+    if (!card) { return; }
+    sel = Math.max(0, visible().indexOf(card));
+    mark();
+    card.focus();
+    showDetail(card);
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.target.closest('input, textarea, select')) { return; }
+    switch (e.key) {
+      case 'j': case 'ArrowDown': e.preventDefault(); move(1); break;
+      case 'k': case 'ArrowUp':   e.preventDefault(); move(-1); break;
+      case 'n': e.preventDefault(); openCompose(); break;
+      case 'Enter': {
+        var card = current();
+        if (card) { toggleDetail(); }
+        break;
+      }
+      case 'Escape': clear(); break;
+      case '?': showHelp(help.hidden); break;
+    }
+  });
+
+  /* The composer is a native <dialog>; the button in the rail and the n key open
+     the same one, and Escape is the dialog's own. */
+  var compose = document.getElementById('compose');
+  var createOpen = document.getElementById('create-open');
+  function openCompose() {
+    if (compose.open) { return; }
+    compose.showModal();
+    compose.querySelector('input[name="title"]').focus();
+  }
+  if (createOpen) { createOpen.addEventListener('click', openCompose); }
+
+  /* Escape clears the dialog first, then the filter, then the side panel, then
+     focuses the filter — one key walks back out of whatever depth the user is in. */
   function clear() {
+    if (compose.open) { compose.close(); return; }
     if (filter.value) { filter.value = ''; mark(); return; }
-    var open = host.querySelector('.detail:not([hidden])');
-    if (open) { open.hidden = true; return; }
+    if (!side.hidden) { side.hidden = true; return; }
     filter.focus();
   }
 
-  document.addEventListener('keydown', function (e) {
-    var typing = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
-
-    if (e.key === 'Escape') { clear(); if (typing) e.target.blur(); return; }
-    if (typing || e.metaKey || e.ctrlKey || e.altKey) { return; }
-
-    switch (e.key) {
-      case 'j': case 'ArrowDown':  e.preventDefault(); move(1); break;
-      case 'k': case 'ArrowUp':    e.preventDefault(); move(-1); break;
-      case 'g': e.preventDefault(); sel = 0; mark(); break;
-      case 'G': e.preventDefault(); sel = visible().length - 1; mark(); break;
-      case 'c': case 's': case 'r': case 'd': case 'u':
-        e.preventDefault(); act(e.key); break;
-      case 'n': e.preventDefault(); document.getElementById('new-title').focus(); break;
-      case '/': e.preventDefault(); filter.focus(); break;
-      case 'Enter': e.preventDefault(); toggleDetail(); break;
-      case '?':
-        e.preventDefault();
-        showHelp(help.hidden);
-        break;
-      default: break;
-    }
-  });
-
-  helpOn.addEventListener('click', function () { showHelp(help.hidden); });
-
-  host.addEventListener('click', function (e) {
-    var row = e.target.closest('.row');
-    if (!row || e.target.closest('.acts')) { return; }
-    var shown = visible();
-    sel = shown.indexOf(row);
-    mark();
-    toggleDetail();
-  });
-
-  filter.addEventListener('input', mark);
-
-  /* Re-render only on real change, and carry selection + open detail across it. */
+  /* A changed board is swapped in wholesale. The side panel lives outside #board, so
+     an open detail survives every poll untouched. */
   function adopt(html) {
-    var keepSel = current();
-    var keepId  = keepSel ? keepSel.dataset.task : null;
-    var openId  = null;
-    var open = host.querySelector('.detail:not([hidden])');
-    if (open) { openId = open.parentElement.dataset.task; }
-
     host.innerHTML = html;
-    sel = 0;
-    if (keepId) {
-      var shown = visible();
-      var i = shown.findIndex(function (r) { return r.dataset.task === keepId; });
-      if (i > -1) { sel = i; }
-    }
-    if (openId) {
-      var target = host.querySelector('[data-task="' + openId + '"] .detail');
-      if (target) { target.hidden = false; }
-    }
+    var hash = host.querySelector('[data-hash]');
+    lastHash = hash ? hash.dataset.hash : null;
     mark();
   }
 
@@ -181,6 +216,7 @@
 
   var hash = host.querySelector('[data-hash]');
   lastHash = hash ? hash.dataset.hash : null;
+
   mark();
   setInterval(poll, 1500);
 })();

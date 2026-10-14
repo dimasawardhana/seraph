@@ -95,12 +95,19 @@ func (b *Board) View() (View, error) {
 	}
 
 	view := View{Root: b.root.Path, Total: len(tasks)}
-	for _, group := range board.Grouped(tasks) {
-		column := Column{Status: group.Status, Label: group.Label}
-		for _, t := range group.Tasks {
-			column.Items = append(column.Items, b.toItem(t))
-		}
-		view.Columns = append(view.Columns, column)
+	// One column per status in vocabulary order, empty ones included: a kanban
+	// board is a track diagram, and a track that is merely empty is still a
+	// track. The Markdown snapshot keeps its non-empty groups.
+	grouped := make(map[string][]Item, len(vocab.Statuses))
+	for _, t := range tasks {
+		grouped[t.Status] = append(grouped[t.Status], b.toItem(t))
+	}
+	for _, status := range vocab.Statuses {
+		view.Columns = append(view.Columns, Column{
+			Status: status.Value,
+			Label:  status.Label,
+			Items:  grouped[status.Value],
+		})
 	}
 	return view, nil
 }

@@ -9,10 +9,10 @@ type Option struct {
 }
 
 var Statuses = []Option{
+	{Value: "backlog", Label: "Backlog", Default: true},
+	{Value: "todo", Label: "To Do"},
 	{Value: "in_progress", Label: "In Progress"},
 	{Value: "review", Label: "Review"},
-	{Value: "todo", Label: "To Do"},
-	{Value: "backlog", Label: "Backlog", Default: true},
 	{Value: "done", Label: "Done"},
 }
 

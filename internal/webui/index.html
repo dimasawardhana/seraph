@@ -7,37 +7,47 @@
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-
-  <div class="mark">SERAPH</div>
-  <div class="where" title="{{.Root}}">{{.Root}}</div>
-  <div class="stats">
+<header class="rail">
+  <div class="mark">
+    <span class="lamps" id="pulse" data-state="live" title="refreshes itself every 1.5s" aria-live="polite"><i></i><i></i><i></i><b>live</b></span>
+    <span class="word">Seraph</span>
+  </div>
+  <div class="where" title="{{.Root}}">
+    <span class="path">{{.Root}}</span>
+    <span class="sep">·</span>
     <span class="stat"><b>{{.View.Total}}</b> task{{if ne .View.Total 1}}s{{end}}</span>
+    <span class="sep">·</span>
     <span class="stat"><b>{{held .View}}</b> yours</span>
   </div>
-  <div class="pulse" id="pulse" data-state="live" title="refreshes itself every 1.5s"><i></i>live</div>
+  <button type="button" class="create" id="create-open">Create task <kbd>N</kbd></button>
 </header>
 
-{{if .Note}}<div class="banner note">{{.Note}}</div>{{end}}
-{{if .Err}}<div class="banner error">{{.Err}}</div>{{end}}
-
-<form class="compose" method="post" action="/act?t={{.Token}}">
-  <input type="hidden" name="action" value="create">
-  <div class="compose-row">
-    <input class="grow" name="title" id="new-title" placeholder="title" required autocomplete="off">
-    <input class="grow" name="goal" placeholder="goal — what changes, for whom" required autocomplete="off">
-    <input class="grow" name="acceptance" placeholder="done when — how anyone can tell" required autocomplete="off">
-    <select name="priority" aria-label="priority" title="priority">
-      {{range .Priorities}}<option value="{{.Value}}"{{if .Default}} selected{{end}}>{{.Value}}</option>{{end}}
-    </select>
-    <select name="triage" aria-label="triage" title="triage">
-      <option value="">triage —</option>
-      {{range .Triages}}<option value="{{.Value}}">{{.Value}}</option>{{end}}
-    </select>
-    <button type="submit">add</button>
-  </div>
-  <p class="compose-hint">Every task states what it is for and how anyone can tell it was finished — the board refuses one without both.</p>
-</form>
-
+<dialog class="compose" id="compose" aria-labelledby="compose-title">
+  <form method="post" action="/act?t={{.Token}}">
+    <input type="hidden" name="action" value="create">
+    <h2 id="compose-title">Create task</h2>
+    <p class="compose-hint">A task states what it is for and how anyone can tell it was finished — the board refuses one without both.</p>
+    <label>Title
+      <input class="grow" name="title" id="new-title" placeholder="what the work is" required autocomplete="off">
+    </label>
+    <label>Goal
+      <input class="grow" name="goal" placeholder="what changes, for whom" required autocomplete="off">
+    </label>
+    <label>Done when
+      <input class="grow" name="acceptance" placeholder="how anyone can tell it was finished" required autocomplete="off">
+    </label>
+    <div class="compose-row">
+      <select name="priority" aria-label="priority" title="priority">
+        {{range .Priorities}}<option value="{{.Value}}"{{if .Default}} selected{{end}}>{{.Value}}</option>{{end}}
+      </select>
+      <select name="triage" aria-label="triage" title="triage">
+        <option value="">triage —</option>
+        {{range .Triages}}<option value="{{.Value}}">{{.Value}}</option>{{end}}
+      </select>
+      <button type="submit">Create task</button>
+    </div>
+  </form>
+</dialog>
 <nav class="filters">
   <input id="filter" placeholder="filter — title, id, or holder" autocomplete="off" spellcheck="false">
   <span class="count" id="count"></span>
@@ -79,33 +89,38 @@
   </div>
 {{end}}
 
+<div class="kanban">
 {{range .View.Columns}}
-<section class="group" data-status="{{.Status}}">
+<section class="column" data-status="{{.Status}}">
   <h2 class="plate"><span>{{.Label}}</span><b>{{len .Items}}</b></h2>
-  <div class="rows">
+  <div class="cards">
   {{range .Items}}
-  <article class="row aspect-{{aspect .}}" data-task="{{.ID}}" data-pri="{{.Priority}}" data-done="{{if eq .Status "done"}}1{{else}}0{{end}}" data-t="{{.ID}} {{.Title}} {{.ClaimHolder}}" tabindex="0">
+  <article class="card aspect-{{aspect .}}" data-task="{{.ID}}" data-pri="{{.Priority}}" data-done="{{if eq .Status "done"}}1{{else}}0{{end}}" data-t="{{.ID}} {{.Title}} {{.ClaimHolder}}" tabindex="0">
     <span class="signal" title="priority: {{.Priority}}"></span>
-    <span class="id">{{.ID}}</span>
-    <span class="title">{{.Title}}</span>
-    {{if .Triage}}<span class="tag">{{.Triage}}</span>{{end}}
-    <span class="holder">
-      {{- if .ClaimedByMe}}<span class="you">you</span> {{ttl .ClaimExpires}}{{- else if .ClaimHolder}}<span class="them">{{.ClaimHolder}}</span> {{ttl .ClaimExpires}}{{- else}}<span class="free">clear</span>{{- end}}
-    </span>
-    <span class="acts">
+    <div class="card-top">
+      <span class="id">{{.ID}}</span>
+      {{if .Triage}}<span class="tag">{{.Triage}}</span>{{end}}
+      <span class="holder">
+        {{- if .ClaimedByMe}}<span class="you">you</span> {{ttl .ClaimExpires}}{{- else if .ClaimHolder}}<span class="them">{{.ClaimHolder}}</span> {{ttl .ClaimExpires}}{{- else}}<span class="free">clear</span>{{- end}}
+      </span>
+    </div>
+    <div class="card-title">{{.Title}}</div>
+    <div class="acts">
       {{if .ClaimedByMe}}
         {{if ne .Status "in_progress"}}<form method="post" action="/act?t={{$.Token}}"><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="status" value="in_progress"><button data-k="s" title="start">start</button></form>{{end}}
         {{if ne .Status "review"}}<form method="post" action="/act?t={{$.Token}}"><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="status" value="review"><button data-k="r" title="review">review</button></form>{{end}}
         <form method="post" action="/act?t={{$.Token}}"><input type="hidden" name="action" value="done"><input type="hidden" name="id" value="{{.ID}}"><button data-k="d" class="done" title="done — releases the claim">done</button></form>
         <form method="post" action="/act?t={{$.Token}}"><input type="hidden" name="action" value="release"><input type="hidden" name="id" value="{{.ID}}"><button data-k="u" title="release without completing">release</button></form>
       {{else if .ClaimHolder}}
-        <span class="locked" aria-hidden="true"></span>
+        <span class="locked">held</span>
       {{else}}
         <form method="post" action="/act?t={{$.Token}}"><input type="hidden" name="action" value="claim"><input type="hidden" name="id" value="{{.ID}}"><button data-k="c" title="claim">claim</button></form>
       {{end}}
-    </span>
+    </div>
     <div class="detail" hidden>
-      {{if .Description}}<p>{{.Description}}</p>{{else}}<p class="none">no description</p>{{end}}
+      <p class="goal">{{if .Goal}}<b>Goal</b> {{.Goal}}{{else}}<b>Goal</b> <span class="none">none</span>{{end}}</p>
+      <p class="acceptance"><b>Done when</b> {{if .Acceptance}}{{.Acceptance}}{{else}}<span class="none">none</span>{{end}}</p>
+      {{if .Description}}<p>{{.Description}}</p>{{end}}
       <dl>
         <div><dt>status</dt><dd>{{.Status}}</dd></div>
         <div><dt>priority</dt><dd>{{.Priority}}</dd></div>
@@ -119,5 +134,7 @@
   </div>
 </section>
 {{end}}
+</div>
+<aside class="side" id="side" hidden></aside>
 </div>
 {{end}}

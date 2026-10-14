@@ -95,83 +95,45 @@ func idText(i dashboard.Item, shown string) string {
 	}
 }
 
-// rowChrome is everything in a row that is not a sized column: the two-column selection
-// marker, the one-column status dot, and the five single spaces between the six fields.
-const rowChrome = 2 + 1 + 5
+// cardChrome is everything in a card that is not text: the marker, the dot,
+// and the spaces between the fields.
+const cardChrome = 2 + 1 + 5
 
-// columns sizes the row from the real terminal width. The returned widths sum to exactly
-// width - rowChrome, which is what keeps a row inside the terminal — a row that wraps
-// becomes two lines in a panel that has already laid out its height, and pushes the board
-// off the top. The priority column is dropped first, then the holder, so the title keeps as
-// much room as the window allows.
-//
-// The sum is a budget, not a guarantee: every caller must clamp its field to the width it
-// was given. An id is padded to nine columns but a five-digit task number is wider than
-// that, so the row must cut it like any other field rather than let it push the row over.
-func columns(width int) (id, prio, title, holder int) {
-	const (
-		idW, prioW, holderW = 9, 8, 18
-		// preferTitle is the title room that must remain before a column is dropped. It is
-		// a threshold for dropping, not the floor: below it the layout keeps whatever is
-		// left, down to one column.
-		preferTitle = 12
-	)
-	free := width - rowChrome
-	id, prio, holder = idW, prioW, holderW
-	if id+prio+holder+preferTitle > free {
-		prio = 0
+// card renders one task inside its column. An active column's cards carry the
+// full aspect signal; a background column's render faint, so the eye goes to
+// the column the cursor is in before it reads anything else.
+func (m *model) card(item dashboard.Item, isSelected, active bool, width int) string {
+	free := width - cardChrome
+	if free < 8 {
+		free = 8
 	}
-	if id+holder+preferTitle > free {
-		holder = 0
+	idw, holderw := 9, 0
+	if free >= 30 {
+		holderw = 12
 	}
-	title = free - id - prio - holder
-	if title < 1 {
-		title = 1
+	titlew := free - idw - holderw
+	if titlew < 1 {
+		titlew = 1
 	}
-	return
-}
-
-func (m *model) row(item dashboard.Item, isSelected bool, width int) string {
-	idw, priow, titlew, holderw := columns(width)
-	a := aspect(item)
 
 	marker := "  "
 	if isSelected {
 		marker = cursor.Render("▸ ")
 	}
 
-	id := ""
-	if idw > 0 {
-		id = padRight(idText(item, cut(item.ID, idw)), idw)
-	}
+	id := padRight(idText(item, cut(item.ID, idw)), idw)
 
-	// Pad the rendered run, not the source word: substituting a glyph for "urgent"
-	// changes the display width, and padding the word leaves the column ragged.
-	prio := ""
-	if priow > 0 {
-		switch item.Priority {
-		case "urgent":
-			prio = padRight(held.Render("!"), priow)
-		case "high":
-			prio = padRight(caution.Render("↑"), priow)
-		default:
-			prio = padRight(faint.Render(item.Priority), priow)
-		}
-	}
-
-	// Truncate the plain string, then style it. Cutting runes inside a styled run would
-	// split an escape sequence and spill colour across the rest of the panel.
 	plain := cut(item.Title, titlew)
 	title := ""
 	switch {
 	case isSelected:
-		// Three signals, because a background block is the first thing to vanish on a
-		// terminal without colour, or when the output goes through a pipe.
 		title = padRight(chosen.Render(plain), titlew)
 	case item.Status == "done":
 		title = padRight(doneTxt.Render(plain), titlew)
-	default:
+	case active:
 		title = padRight(txt.Render(plain), titlew)
+	default:
+		title = padRight(faint.Render(plain), titlew)
 	}
 
 	holder := ""
@@ -180,9 +142,62 @@ func (m *model) row(item dashboard.Item, isSelected bool, width int) string {
 	}
 
 	return strings.TrimRight(
-		fmt.Sprintf("%s %s %s %s %s %s", marker, dot(a), id, prio, title, holder), " ")
+		fmt.Sprintf("%s %s %s %s %s", marker, dot(aspect(item)), id, title, holder), " ")
 }
 
+// detailLines renders the detail overlay: the full record of one task, since
+// the board's own promise is that a task carries its goal and acceptance and
+// the compact card cannot hold them.
+func detailLines(item dashboard.Item, width int) []string {
+	wrap := func(s string) []string {
+		if s == "" {
+			return nil
+		}
+		var out []string
+		for _, para := range strings.Split(s, "\n") {
+			for len(para) > width-4 {
+				cutAt := width - 4
+				if cutAt >= len(para) {
+					cutAt = len(para) - 1
+				}
+				if sp := strings.LastIndex(para[:cutAt], " "); sp > 0 {
+					cutAt = sp
+				}
+				out = append(out, "  "+para[:cutAt])
+				para = para[cutAt:]
+				para = strings.TrimLeft(para, " ")
+			}
+			out = append(out, "  "+para)
+		}
+		return out
+	}
+
+	head := "  " + plate.Render(strings.ToUpper(item.ID)) + "  " + txt.Render(item.Title)
+	out := []string{head, ""}
+	out = append(out, faint.Render("  GOAL"))
+	out = append(out, wrap(item.Goal)...)
+	if item.Acceptance != "" {
+		out = append(out, faint.Render("  DONE WHEN"))
+		out = append(out, wrap(item.Acceptance)...)
+	}
+	if item.Description != "" {
+		out = append(out, faint.Render("  NOTES"))
+		out = append(out, wrap(item.Description)...)
+	}
+	out = append(out, "")
+	meta := fmt.Sprintf("  %s · %s", dashboard.StatusLabel(item.Status), item.Priority)
+	if item.Triage != "" {
+		meta += " · " + item.Triage
+	}
+	if item.ClaimHolder != "" {
+		meta += " · " + stripStyle(holderText(item))
+	}
+	out = append(out, faint.Render(meta))
+	out = append(out, "", "  "+faint.Render("esc back"))
+	return out
+}
+
+// stripStyle removes escape sequences so a styled run can be measured as plain text.
 // cut shortens to a display width. It measures with lipgloss rather than counting runes,
 // so CJK and emoji do not overflow the column.
 func cut(s string, width int) string {
@@ -202,7 +217,6 @@ func cut(s string, width int) string {
 	return ""
 }
 
-// stripStyle removes escape sequences so a styled run can be measured as plain text.
 func stripStyle(s string) string {
 	var b strings.Builder
 	plain := true

@@ -28,13 +28,14 @@ const (
 )
 
 type model struct {
-	board    *dashboard.Board
-	view     dashboard.View
-	flat     []dashboard.Item
-	selected int
-	compose  *compose
-	message  string
-	drawn    int
+	board   *dashboard.Board
+	view    dashboard.View
+	col     int
+	row     int
+	detail  bool
+	compose *compose
+	message string
+	drawn   int
 }
 
 func Run(root repo.Root) error {
@@ -86,31 +87,93 @@ func Run(root repo.Root) error {
 		}
 	}
 }
-
 func (m *model) reload() error {
 	view, err := m.board.View()
 	if err != nil {
 		return err
 	}
 	m.view = view
-	m.flat = m.flat[:0]
-	for _, c := range view.Columns {
-		m.flat = append(m.flat, c.Items...)
-	}
-	if m.selected >= len(m.flat) {
-		m.selected = len(m.flat) - 1
-	}
-	if m.selected < 0 {
-		m.selected = 0
-	}
+	m.clamp()
 	return nil
 }
 
+// clamp keeps the cursor inside the column grid after every reload: a task that
+// moved status, or a column that emptied, must not leave the cursor nowhere.
+func (m *model) clamp() {
+	if m.col < 0 {
+		m.col = 0
+	}
+	if m.col >= len(m.view.Columns) {
+		m.col = len(m.view.Columns) - 1
+	}
+	if m.col < 0 {
+		m.col = 0
+		return
+	}
+	if m.row >= len(m.view.Columns[m.col].Items) {
+		m.row = len(m.view.Columns[m.col].Items) - 1
+	}
+	if m.row < 0 {
+		m.row = 0
+	}
+}
+
 func (m *model) current() (dashboard.Item, bool) {
-	if m.selected < 0 || m.selected >= len(m.flat) {
+	if m.col < 0 || m.col >= len(m.view.Columns) {
 		return dashboard.Item{}, false
 	}
-	return m.flat[m.selected], true
+	items := m.view.Columns[m.col].Items
+	if m.row < 0 || m.row >= len(items) {
+		return dashboard.Item{}, false
+	}
+	return items[m.row], true
+}
+
+func (m *model) handle(k string) (quit bool) {
+	if m.compose != nil {
+		return m.handlePrompt(k)
+	}
+
+	if m.detail {
+		if k == "esc" || k == "enter" {
+			m.detail = false
+		}
+		return false
+	}
+
+	switch k {
+	case "q", "ctrl+c":
+		return true
+	case "j", "down":
+		m.row++
+	case "k", "up":
+		m.row--
+	case "h", "left":
+		m.col--
+	case "l", "right":
+		m.col++
+	}
+	m.clamp()
+
+	switch k {
+	case "c":
+		m.act(func(id string) error { return m.board.Claim(id) }, "Claimed")
+	case "u":
+		m.act(func(id string) error { return m.board.Release(id) }, "Released")
+	case "s":
+		m.act(func(id string) error { return m.board.SetStatus(id, "in_progress") }, "Started")
+	case "r":
+		m.act(func(id string) error { return m.board.SetStatus(id, "review") }, "Reviewing")
+	case "d":
+		m.act(func(id string) error { return m.board.SetStatus(id, "done") }, "Completed")
+	case "n":
+		m.startCompose()
+	case "enter", " ":
+		if _, ok := m.current(); ok {
+			m.detail = true
+		}
+	}
+	return false
 }
 
 func (m *model) act(fn func(id string) error, done string) {
@@ -124,42 +187,6 @@ func (m *model) act(fn func(id string) error, done string) {
 		m.message = done + " " + item.ID
 	}
 	_ = m.reload()
-}
-
-func (m *model) handle(k string) (quit bool) {
-	if m.compose != nil {
-		return m.handlePrompt(k)
-	}
-
-	switch k {
-	case "q", "ctrl+c":
-		return true
-	case "j", "down":
-		if m.selected < len(m.flat)-1 {
-			m.selected++
-		}
-	case "k", "up":
-		if m.selected > 0 {
-			m.selected--
-		}
-	case "g":
-		m.selected = 0
-	case "G":
-		m.selected = len(m.flat) - 1
-	case "c":
-		m.act(func(id string) error { return m.board.Claim(id) }, "Claimed")
-	case "u":
-		m.act(func(id string) error { return m.board.Release(id) }, "Released")
-	case "s":
-		m.act(func(id string) error { return m.board.SetStatus(id, "in_progress") }, "Started")
-	case "r":
-		m.act(func(id string) error { return m.board.SetStatus(id, "review") }, "Reviewing")
-	case "d":
-		m.act(func(id string) error { return m.board.SetStatus(id, "done") }, "Completed")
-	case "n":
-		m.startCompose()
-	}
-	return false
 }
 
 func (m *model) handlePrompt(k string) bool {
@@ -223,12 +250,8 @@ func (m *model) draw() {
 // leaves the cursor in the column it was already in, and each line begins further right
 // than the one above it until the board walks off the right edge and wraps.
 func (m *model) frame(width, height int) string {
-	lines, cursor := m.lines(width)
+	lines, cursor := m.lines(width, height)
 
-	// The bottom of the panel is a fixed-height block, so the board rows above it keep their
-	// place whether or not the compose prompts are open. Everything here is cleared and
-	// rewritten every paint; a line this panel does not account for is a line it never
-	// blanks, and the previous frame stays on screen underneath it.
 	compose := []string{}
 	if m.compose != nil {
 		compose = m.compose.lines(width)
@@ -264,7 +287,7 @@ func (m *model) frame(width, height int) string {
 	}
 	b.WriteString(home)
 
-	for i := 0; i < pad; i++ {
+	for i := range pad {
 		text := ""
 		if i < len(shown) {
 			text = shown[i]
@@ -282,25 +305,65 @@ func (m *model) frame(width, height int) string {
 	return b.String()
 }
 
-func (m *model) lines(width int) ([]string, int) {
-	var out []string
-	cursor := 0
-	index := 0
-	for _, c := range m.view.Columns {
-		out = append(out, "",
-			"  "+plate.Render(strings.ToUpper(c.Label))+" "+faint.Render(fmt.Sprintf("%d", len(c.Items))))
-		for _, item := range c.Items {
-			if index == m.selected {
-				cursor = len(out)
-			}
-			out = append(out, m.row(item, index == m.selected, width))
-			index++
+// lines renders the board as kanban columns: one per status, laid out side by
+// side, each column a stack of cards. The column the cursor sits in is the
+// active one; the others render faint. When the detail overlay is open it
+// replaces the board view.
+func (m *model) lines(width, height int) ([]string, int) {
+	if m.detail {
+		if item, ok := m.current(); ok {
+			return detailLines(item, width), 0
+		}
+		m.detail = false
+	}
+
+	cols := m.view.Columns
+	if len(cols) == 0 {
+		return []string{"  " + faint.Render("The board is empty. Press n to add a task.")}, 0
+	}
+
+	each := width / len(cols)
+	if each < 14 {
+		each = 14
+	}
+
+	deepest := 0
+	for _, c := range cols {
+		if len(c.Items) > deepest {
+			deepest = len(c.Items)
 		}
 	}
-	if len(out) == 0 {
-		out = []string{"  " + faint.Render("The board is empty. Press n to add a task.")}
+
+	var out []string
+	cursor := 0
+	out = append(out, m.header(width, each)...)
+	cursor += len(out)
+	for slot := range deepest {
+		line := ""
+		for ci, c := range cols {
+			card := ""
+			if slot < len(c.Items) {
+				card = m.card(c.Items[slot], ci == m.col && slot == m.row, ci == m.col, each)
+			}
+			line += padRight(card, each)
+		}
+		out = append(out, line)
+		if m.col < len(cols) && slot == m.row {
+			cursor = len(out) - 1
+		}
 	}
 	return out, cursor
+}
+
+// header renders one column plate per status, with counts, all on one line.
+func (m *model) header(width, each int) []string {
+	line := ""
+	for _, c := range m.view.Columns {
+		p := plate.Render(strings.ToUpper(c.Label)) +
+			faint.Render(fmt.Sprintf(" %d", len(c.Items)))
+		line += padRight(" "+p, each)
+	}
+	return []string{line}
 }
 
 func padRight(s string, width int) string {

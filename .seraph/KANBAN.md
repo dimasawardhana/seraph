@@ -50,6 +50,24 @@ references:
 > **Done when:** 3. If any code change follows, tests pin it and gofmt/vet/test are green. [NOT YET APPLICABLE: no code change under this task.]
 > **Done when:** SO THE HONEST STATE: a narrower claim than first written, the wrong number removed, the transient window recorded as transient, the unverified count withdrawn, and the open design question left open.
 
+### TASK-139 · Redesign the webui detail as a titled sidebar
+
+> **Goal:** When a dispatcher selects a card in the browser board the detail opens in the sidebar with a real header showing the task title, replacing the current cloned-detail treatment so the panel reads as a panel, not a card copy.
+- priority: medium
+- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T08:10:10Z)
+- updated: 2026-10-14T07:40:10Z
+
+> **Done when:** 1. Clicking or keyboard-selecting a card shows its detail in the sidebar with the task title as a visible header. 2. Esc closes, selection moves keep the header in sync. 3. gofmt/vet/test green and verified in the browser on a rebuilt binary.
+
+### TASK-143 · Commit and push webui redesign and column ordering
+
+> **Goal:** When done, the shipped webui/modal redesign and the workflow-ordered kanban columns are landed in one commit and pushed, so the repository's committed board and tree match what was verified in the browser.
+- priority: medium
+- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T09:08:58Z)
+- updated: 2026-10-14T08:38:58Z
+
+> **Done when:** One commit carries the webui redesign and the workflow-ordered columns with the re-rendered snapshots; push succeeds and the remote matches HEAD.
+
 
 ## Done
 
@@ -161,6 +179,12 @@ references:
 - priority: high
 - updated: 2026-10-14T01:53:52Z
 
+### TASK-137 · Refine the UI and TUI into a kanban board with card detail
+
+> **Goal:** The browser panel and terminal board currently read as lists grouped by status; when the developer dispatches work they want a true kanban board — one column per status with cards in it — and selecting a card opens that task's detail, so both surfaces match how they actually scan work.
+- priority: high
+- updated: 2026-10-14T07:22:49Z
+
 ### TASK-105 · Document seraph gate, seraph hook and seraph version in USING.md
 
 > **Goal:** docs/USING.md documents install, doctor, board and ui, but never the three commands that make the claim gate usable: `seraph gate`, `seraph hook` and `seraph version`. A reader who wants to know whether their harness can enforce claims is told nothing.
@@ -232,6 +256,30 @@ references:
 > **Goal:** The migration hardening and TUI layout fixes are finished and green but sit uncommitted with one untracked test file, and TASK-122 is marked done while its own acceptance criteria still read unchecked, so a clone gets the pre-fix tree and the board overstates its own record.
 - priority: medium
 - updated: 2026-10-09T11:37:17Z
+
+### TASK-138 · Kanban surfaces show every status column, empty ones included
+
+> **Goal:** The webui and TUI currently drop any status with no tasks, so a dispatcher reading the board sees only Backlog and Done and has nowhere to move work to; rendering all five status columns makes the board read as the track diagram DESIGN.md describes.
+- priority: medium
+- updated: 2026-10-14T04:51:46Z
+
+### TASK-140 · Webui: compose becomes modal, header rail becomes signal-head wordmark
+
+> **Goal:** When done, dispatchers create tasks through a native modal dialog instead of a permanent compose strip, and the header rail carries a signal-head Seraph wordmark that reports board liveness at a glance.
+- priority: medium
+- updated: 2026-10-14T08:28:35Z
+
+### TASK-141 · Webui smoke: modal round-trip
+
+> **Goal:** Proves the dialog submits a real create.
+- priority: medium
+- updated: 2026-10-14T08:27:52Z
+
+### TASK-142 · Order board columns by workflow, backlog through done
+
+> **Goal:** When done, the board reads left-to-right in workflow order — backlog, todo, in_progress, review, done — on the browser panel, the terminal board and every snapshot, instead of the current in_progress-first order.
+- priority: medium
+- updated: 2026-10-14T08:35:51Z
 
 ### TASK-125 · Commit the board snapshots after TASK-123 and TASK-124
 

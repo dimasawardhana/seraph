@@ -1,6 +1,7 @@
 /* Seraph — signal panel.
-   Colour carries state only: clear, mine, held, caution. Nothing else is tinted.
-   Elevation is declared once, as a 1px border. No shadows, no ghost cards. */
+   Colour carries state first: clear, mine, held, caution. Structure carries hue
+   second: each board column owns a hue, so the board reads by colour before it
+   reads by text. Elevation is declared once, as a 1px border. */
 
 :root {
   --ground: #101318;
@@ -15,9 +16,14 @@
   --held:   #f08a80;
   --caution:#e8b04b;
   --sel:    #1d232c;
+  /* per-column hues: in_progress, review, todo, backlog, done */
+  --hue-a:  #6fb3e0;  /* work in flight — steel blue */
+  --hue-b:  #b78ae8;  /* awaiting review — muted violet */
+  --hue-c:  #6fc9a8;  /* ready — sea green */
+  --hue-d:  #c8a86f;  /* backlog — paper amber */
+  --hue-e:  #8f9aa8;  /* done — slate */
   color-scheme: dark;
 }
-
 @media (prefers-color-scheme: light) {
   :root {
     --ground: #eceff3;
@@ -32,9 +38,15 @@
     --held:   #9e2018;
     --caution:#75500a;
     --sel:    #e4ebf4;
+    --hue-a:  #2b6ca3;
+    --hue-b:  #7d55c0;
+    --hue-c:  #1d7a55;
+    --hue-d:  #8a6516;
+    --hue-e:  #5c6672;
     color-scheme: light;
   }
 }
+
 
 * { box-sizing: border-box; }
 
@@ -78,35 +90,66 @@ input::placeholder { color: var(--ink-faint); opacity: 1; }
   top: 0;
   z-index: 10;
 }
-.mark {
+
+/* The wordmark carries a three-lamp signal head: green live, amber stale,
+   red down. The board's state is the brand mark, not a pip beside it. */
+.mark { display: flex; align-items: center; gap: 10px; }
+.word {
   font: 600 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: .16em;
+  text-transform: uppercase;
   color: var(--ink);
 }
+.lamps {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 4px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ground) 60%, var(--panel));
+}
+.lamps i { width: 6px; height: 6px; border-radius: 50%; background: var(--rule-strong); opacity: .5; transition: all 200ms ease-out; }
+.lamps b { font: 600 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .1em; margin-left: 3px; color: var(--ink-dim); }
+.lamps[data-state="live"] i:nth-child(1) { background: var(--mine); opacity: 1; }
+.lamps[data-state="stale"] i:nth-child(2) { background: var(--caution); opacity: 1; }
+.lamps.down i:nth-child(3) { background: var(--held); opacity: 1; }
+.lamps[data-state="stale"] b { color: var(--caution); }
+.lamps.down b { color: var(--held); }
+.lamps.down b::after { content: ""; }
+.lamps.down b { font-size: 0; }
+.lamps.down b::before { content: "down"; font-size: 9px; }
+.lamps[data-state="stale"] b { font-size: 0; }
+.lamps[data-state="stale"] b::before { content: "stale"; font-size: 9px; }
+
 .where {
   flex: 1;
   min-width: 0;
+  display: flex; align-items: center; gap: 8px;
   color: var(--ink-dim);
   font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-  direction: rtl;
-  text-align: left;
 }
-.stats { display: flex; gap: 14px; font-size: 12px; color: var(--ink-dim); }
-.stat b { color: var(--ink); font-weight: 600; }
+.where .path { overflow: hidden; text-overflow: ellipsis; }
+.where .sep { color: var(--ink-faint); }
+.where .stat b { color: var(--ink); font-weight: 600; }
 
-.pulse { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-dim); letter-spacing: .06em; }
-.pulse i {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--mine);
-  transition: background 200ms ease-out, opacity 200ms ease-out;
-  opacity: .45;
+.create {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-color: var(--hue-c);
+  color: var(--hue-c);
+  font-weight: 600;
+  background: var(--panel);
+  height: 30px;
 }
-.pulse[data-state="live"] i { opacity: 1; }
-.pulse[data-state="stale"] i { background: var(--caution); opacity: 1; }
-.pulse.down i { background: var(--held); opacity: 1; }
+.create:hover { background: color-mix(in srgb, var(--hue-c) 14%, var(--panel)); border-color: var(--hue-c); }
+.create:active { transform: translateY(1px); }
+.create kbd {
+  font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid color-mix(in srgb, var(--hue-c) 45%, var(--rule));
+  border-radius: 2px;
+  padding: 2px 4px;
+  color: inherit;
+}
 
 
 /* ── banners ─────────────────────────────────────────────── */
@@ -120,32 +163,71 @@ input::placeholder { color: var(--ink-faint); opacity: 1; }
 .banner.note  { color: var(--mine);   border-left: 1px solid var(--mine); }
 .banner.error { color: var(--held);   border-left: 1px solid var(--held); }
 
-/* ── compose + filters ───────────────────────────────────── */
+/* ── compose modal + filters ─────────────────────────────── */
 
-.compose, .filters {
+.filters {
   display: flex;
   gap: 8px;
   padding: 12px 20px;
-  align-items: center;
-  flex-wrap: wrap;
 }
-.filters { padding-top: 0; }
+
+/* The composer is a native <dialog>: a panel of the same enamel as the
+   board, opening in place over it. No overlay drama. */
+.compose {
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 22px 24px;
+  width: min(480px, calc(100vw - 32px));
+  box-shadow: 0 18px 50px -12px rgb(0 0 0 / .45);
+}
+.compose::backdrop {
+  background: color-mix(in srgb, var(--ground) 55%, transparent);
+  backdrop-filter: blur(2px);
+}
+.compose[open] { display: flex; flex-direction: column; gap: 14px; animation: compose-in 140ms ease-out; }
+@keyframes compose-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.compose h2 {
+  margin: 0;
+  font: 600 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.compose .compose-hint { margin: 0; font-size: 12px; color: var(--ink-dim); }
+.compose label {
+  display: flex; flex-direction: column; gap: 5px;
+  font-size: 12px; color: var(--ink-dim);
+}
+.compose input {
+  height: 34px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.compose .compose-row { display: flex; gap: 8px; align-items: center; }
+.compose .compose-row select { height: 34px; }
+.compose .compose-row button[type=submit] { margin-left: auto; height: 34px; }
+.compose button[type=submit] {
+  border-color: var(--hue-c); color: var(--hue-c); font-weight: 600;
+  background: var(--panel);
+}
+.compose button[type=submit]:hover {
+  background: color-mix(in srgb, var(--hue-c) 16%, var(--panel));
+  border-color: var(--hue-c);
+}
+.compose button[type=submit]:active { transform: translateY(1px); }
 
 input, select, button {
   font: inherit;
-  color: var(--ink);
-  background: var(--ground);
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  padding: 6px 10px;
-  height: 30px;
 }
-input:hover, select:hover, button:hover { border-color: var(--rule-strong); }
+
 button { cursor: pointer; background: var(--panel); }
-.compose .grow { flex: 1 1 220px; }
-.compose input[name="goal"], .compose input[name="acceptance"] { flex: 1 1 260px; }
-.compose button[type=submit] { border-color: var(--mine); color: var(--mine); }
-.compose button[type=submit]:hover { background: color-mix(in srgb, var(--mine) 14%, var(--panel)); }
+input:focus, select:focus, .filters input:focus { border-color: var(--hue-a); }
+input:focus-visible, select:focus-visible { outline-color: var(--hue-a); }
 .filters input { flex: 1 1 240px; }
 .filters .count { font-size: 12px; color: var(--ink-dim); margin-left: auto; }
 .link { background: none; border: none; color: var(--ink-dim); padding: 0 6px; height: auto; }
@@ -173,7 +255,6 @@ main { padding: 0 20px 72px; }
 @media (max-width: 900px) { .panel { max-width: none; } }
 
 .group + .group { border-top: 1px solid var(--rule); }
-
 .plate {
   display: flex; align-items: center; gap: 10px;
   margin: 0;
@@ -181,34 +262,62 @@ main { padding: 0 20px 72px; }
   font: 600 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: .14em;
   text-transform: uppercase;
-  color: var(--ink-dim);
-  background: color-mix(in srgb, var(--ground) 55%, var(--panel));
+  color: color-mix(in srgb, var(--col, var(--ink-dim)) 78%, var(--ink));
+  background: color-mix(in srgb, var(--col, var(--clear)) 9%, color-mix(in srgb, var(--ground) 55%, var(--panel)));
+  box-shadow: inset 0 2px 0 0 color-mix(in srgb, var(--col, var(--clear)) 55%, transparent);
   border-bottom: 1px solid var(--rule);
 }
 .locked { width: 1px; height: 1px; display: block; }
 
-/* ── rows ────────────────────────────────────────────────── */
+/* Each column owns its hue. The plate picks it up as text and a tinted bar; the
+   column ground gets a whisper of the same hue so the board reads by colour. */
+.column[data-status="in_progress"] { --col: var(--hue-a); }
+.column[data-status="review"]      { --col: var(--hue-b); }
+.column[data-status="todo"]        { --col: var(--hue-c); }
+.column[data-status="backlog"]     { --col: var(--hue-d); }
+.column[data-status="done"]        { --col: var(--hue-e); }
+.column { --col: var(--clear); }
+/* ── kanban ──────────────────────────────────────────────── */
 
-.row {
-  display: grid;
-  grid-template-columns: 10px 78px 1fr auto 150px auto;
-  align-items: center;
-  gap: 12px;
-  padding: 0 14px;
-  min-height: 34px;
+.kanban {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+}
+.column {
+  flex: 1 0 236px;
+  min-width: 236px;
+  max-width: 320px;
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--rule);
+  min-height: 60vh;
+  background: color-mix(in srgb, var(--col) 4%, var(--ground));
+}
+.column:last-child { border-right: 0; }
+.column .plate { justify-content: space-between; }
+.cards { display: flex; flex-direction: column; }
+
+.card {
+  padding: 10px 12px 8px;
   border-bottom: 1px solid color-mix(in srgb, var(--rule) 55%, transparent);
   cursor: default;
-  scroll-margin: 44px;
+  outline: none;
 }
-.row:last-child { border-bottom: 0; }
-.row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
-.row[data-sel="1"] { background: var(--sel); }
-.row[data-sel="1"] .title { color: var(--ink); }
+.card:hover { background: color-mix(in srgb, var(--col) 7%, transparent); }
+.card[data-sel="1"] { background: color-mix(in srgb, var(--col) 12%, var(--sel)); }
+
+.card-top {
+  display: flex; align-items: baseline; gap: 8px;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin-bottom: 3px;
+}
+.card-top .holder { margin-left: auto; }
 
 .signal {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--clear);
-  justify-self: center;
+  display: inline-block;
+  margin-right: 7px;
 }
 .aspect-mine    .signal { background: var(--mine); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mine) 22%, transparent); }
 .aspect-held    .signal { background: var(--held); }
@@ -219,11 +328,11 @@ main { padding: 0 20px 72px; }
   color: var(--ink-faint);
   letter-spacing: -.01em;
 }
-.row[data-pri="urgent"] .id { color: var(--held); font-weight: 600; }
-.row[data-pri="high"]   .id { color: var(--caution); }
+.card[data-pri="urgent"] .id { color: var(--held); font-weight: 600; }
+.card[data-pri="high"]   .id { color: var(--caution); }
 
-.title { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row[data-done="1"] .title { color: var(--ink-faint); text-decoration: line-through; text-decoration-thickness: 1px; }
+.card-title { color: var(--ink); overflow-wrap: anywhere; }
+.card[data-done="1"] .card-title { color: var(--ink-faint); text-decoration: line-through; text-decoration-thickness: 1px; }
 
 .tag {
   font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -238,14 +347,13 @@ main { padding: 0 20px 72px; }
   font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--ink-dim);
   white-space: nowrap;
-  text-align: right;
 }
 .you  { color: var(--mine); font-weight: 600; }
 .them { color: var(--ink); }
 .free { color: var(--ink-faint); letter-spacing: .08em; text-transform: uppercase; font-size: 11px; }
 .aspect-caution .holder { color: var(--caution); }
 
-.acts { display: flex; gap: 4px; align-items: center; }
+.acts { display: flex; gap: 4px; align-items: center; margin-top: 6px; }
 .acts form { display: inline; margin: 0; }
 .acts button {
   height: 22px; padding: 0 8px; font-size: 11px;
@@ -261,15 +369,14 @@ main { padding: 0 20px 72px; }
 }
 .locked { font-size: 11px; color: var(--held); letter-spacing: .06em; }
 
-/* ── detail ──────────────────────────────────────────────── */
+/* ── detail: in-card block + side panel ──────────────────── */
 
 .detail {
-  grid-column: 1 / -1;
-  padding: 10px 0 14px 100px;
+  padding: 8px 0 4px;
   border-top: 1px dashed var(--rule);
   margin-top: 8px;
 }
-.detail p { margin: 0 0 10px; color: var(--ink); white-space: pre-wrap; max-width: 78ch; }
+.detail p { margin: 0 0 10px; color: var(--ink); white-space: pre-wrap; }
 .detail p.none { color: var(--ink-faint); }
 .detail dl { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; }
 .detail dl > div { display: flex; gap: 7px; align-items: baseline; }
@@ -278,6 +385,52 @@ main { padding: 0 20px 72px; }
   letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint);
 }
 .detail dd { margin: 0; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-dim); }
+
+.side {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 400px; max-width: 90vw;
+  padding: 0;
+  overflow-y: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--rule-strong);
+  box-shadow: -12px 0 32px rgba(0,0,0,.18);
+  z-index: 10;
+}
+
+/* The side panel is a task panel, not a card copy. Its header carries the signal,
+   the id, the holder, and the title as its heading — the panel's own identity. */
+.side-head {
+  position: sticky; top: 0;
+  padding: 16px 18px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--rule);
+}
+.side-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.side-id {
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink-dim);
+}
+.side-close {
+  margin-left: auto;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .06em;
+  color: var(--ink-faint);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 2px 7px;
+  cursor: pointer;
+}
+.side-close:hover { color: var(--ink); border-color: var(--rule-strong); }
+.side-title {
+  margin: 0;
+  font-size: 17px; line-height: 1.35; font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.side-body { padding: 14px 18px 18px; }
+.side .detail { border-top: 0; margin-top: 0; padding-top: 0; }
 
 .empty { padding: 34px 16px; }
 .empty p { margin: 0 0 6px; color: var(--ink-dim); }
@@ -300,29 +453,13 @@ main { padding: 0 20px 72px; }
   .rail { gap: 10px; padding: 0 12px; }
   .stats { display: none; }
   .compose, .filters, .help, main { padding-left: 12px; padding-right: 12px; }
-  .compose-row { gap: 6px; }
-  .compose .grow, .compose input[name="goal"], .compose input[name="acceptance"] { flex: 1 1 100%; }
-  .compose button[type=submit] { flex: 1 1 auto; }
+  .compose-row { gap: 6px; flex-wrap: wrap; }
+  .compose .compose-row button[type=submit] { margin-left: 0; flex: 1 1 auto; }
 
-  /* Holder and triage are the two things that tell you whether to act, so the
-     narrow layout drops the row height rather than the state. */
-  .row {
-    grid-template-columns: 10px minmax(0, 1fr) auto;
-    grid-template-areas:
-      "signal title title"
-      ".       id    acts"
-      ".       holder holder";
-    gap: 3px 10px;
-    padding: 9px 12px;
-    min-height: 0;
-    align-items: start;
-  }
-  .signal { grid-area: signal; align-self: center; margin-top: 4px; }
-  .title  { grid-area: title; white-space: normal; overflow-wrap: anywhere; }
-  .id     { grid-area: id; align-self: center; white-space: nowrap; }
-  .acts   { grid-area: acts; align-self: center; flex-wrap: wrap; justify-content: flex-end; max-width: 190px; }
-  .holder { display: block; grid-area: holder; text-align: left; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tag    { display: none; }
-  .detail p { max-width: none; }
+  .kanban { flex-direction: column; overflow-x: visible; }
+  .column { min-width: 0; max-width: none; border-right: 0; min-height: 0; }
+  .side { width: 100vw; max-width: 100vw; border-left: 0; }
+  .side-head, .side-body { padding-left: 12px; padding-right: 12px; }
+  .acts { flex-wrap: wrap; }
   .foot { display: none; }
 }

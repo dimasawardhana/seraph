@@ -39,8 +39,6 @@ func startOf(line, needle string) int {
 // the board cannot be read down. This is the alignment the board promises.
 func TestHeldAndFreeRowsShareOneColumnGrid(t *testing.T) {
 	m := &model{}
-	// A five- and a six-digit id are wider than the nine-column id field, so they
-	// exercise the cut: an uncut id pushes every later column right on its own row.
 	free := item("TASK-101", "high", "Alpha title", "", false)
 	long1 := item("TASK-10000", "high", "Beta title", "kiro-ee6cfe57", false)
 	long2 := item("TASK-100000", "low", "Gamma title", "someone", false)
@@ -51,12 +49,12 @@ func TestHeldAndFreeRowsShareOneColumnGrid(t *testing.T) {
 	for _, width := range []int{68, 80, 100, 120, 160, 240} {
 		starts := make([]int, len(rows))
 		for i, it := range rows {
-			line := m.row(it, false, width)
+			line := m.card(it, false, true, width)
 			starts[i] = startOf(line, string([]rune(it.Title)[:5]))
 		}
 		for i := 1; i < len(starts); i++ {
 			if starts[i] != starts[0] {
-				t.Errorf("width %d: row %d starts its title at column %d, row 0 at %d — "+
+				t.Errorf("width %d: card %d starts its title at column %d, card 0 at %d — "+
 					"the columns do not line up", width, i, starts[i], starts[0])
 			}
 		}
@@ -78,7 +76,7 @@ func TestPriorityStartsAtOneColumn(t *testing.T) {
 	for _, width := range []int{68, 80, 120, 200} {
 		want := -1
 		for _, it := range rows {
-			line := m.row(it, false, width)
+			line := m.card(it, false, true, width)
 			// A cut id shows its first eight characters and an ellipsis, so the
 			// needle is the first seven — present whether or not the id was cut.
 			needle := it.ID
@@ -118,7 +116,7 @@ func TestNoRenderedLineExceedsTheTerminalWidth(t *testing.T) {
 	for width := 40; width <= 240; width += 2 {
 		for _, it := range tasks {
 			for _, sel := range []bool{false, true} {
-				line := m.row(it, sel, width)
+				line := m.card(it, sel, true, width)
 				if got := lipgloss.Width(line); got > width {
 					t.Errorf("width %d: row renders %d columns — it wraps. %q",
 						width, got, stripStyle(line))

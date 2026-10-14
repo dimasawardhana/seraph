@@ -31,6 +31,36 @@
       "updated_at": "2026-10-14T04:10:16Z"
     },
     {
+      "id": "TASK-139",
+      "title": "Redesign the webui detail as a titled sidebar",
+      "goal": "When a dispatcher selects a card in the browser board the detail opens in the sidebar with a real header showing the task title, replacing the current cloned-detail treatment so the panel reads as a panel, not a card copy.",
+      "acceptance": "1. Clicking or keyboard-selecting a card shows its detail in the sidebar with the task title as a visible header. 2. Esc closes, selection moves keep the header in sync. 3. gofmt/vet/test green and verified in the browser on a rebuilt binary.",
+      "status": "backlog",
+      "priority": "medium",
+      "claim": {
+        "harness": "omp",
+        "session": "01a13584-f4a2-7089-9bea-7b1325675c55",
+        "expires": "2026-10-14T08:10:10Z"
+      },
+      "created_at": "2026-10-14T07:39:48Z",
+      "updated_at": "2026-10-14T07:40:10Z"
+    },
+    {
+      "id": "TASK-143",
+      "title": "Commit and push webui redesign and column ordering",
+      "goal": "When done, the shipped webui/modal redesign and the workflow-ordered kanban columns are landed in one commit and pushed, so the repository's committed board and tree match what was verified in the browser.",
+      "acceptance": "One commit carries the webui redesign and the workflow-ordered columns with the re-rendered snapshots; push succeeds and the remote matches HEAD.",
+      "status": "backlog",
+      "priority": "medium",
+      "claim": {
+        "harness": "omp",
+        "session": "01a13584-f4a2-7089-9bea-7b1325675c55",
+        "expires": "2026-10-14T09:08:58Z"
+      },
+      "created_at": "2026-10-14T08:38:07Z",
+      "updated_at": "2026-10-14T08:38:58Z"
+    },
+    {
       "id": "TASK-101",
       "title": "Sync ROADMAP.md with shipped scope",
       "goal": "ROADMAP.md describes v1 as six MCP tools, but internal/ also ships webui, dashboard, tui, vocab and gate. Either the roadmap records that scope as carried forward with the reason it is not in v1, or the scope line is corrected. The roadmap must not silently disagree with the tree.",
@@ -287,6 +317,18 @@
       "updated_at": "2026-10-14T01:53:52Z"
     },
     {
+      "id": "TASK-137",
+      "title": "Refine the UI and TUI into a kanban board with card detail",
+      "goal": "The browser panel and terminal board currently read as lists grouped by status; when the developer dispatches work they want a true kanban board — one column per status with cards in it — and selecting a card opens that task's detail, so both surfaces match how they actually scan work.",
+      "acceptance": "1. Both the webui and the TUI render one column per status (backlog, todo, in_progress, review, done) with task cards stacked in their column, rather than rows in a single list.\n2. Selecting a card in either surface opens the task's detail (goal, acceptance, priority, triage, claim holder, references) without leaving the board view.\n3. Every action that exists today in each surface remains reachable (create, claim, move, edit, close) — the redesign changes layout and navigation, not capability.\n4. Keyboard-first holds in the TUI (columns and cards both navigable, detail open/close has a key) and the webui keeps keyboard operability per DESIGN.md.\n5. gofmt/vet/test green; TUI verified by launching the actual terminal board; webui verified in a real browser at desktop and narrow widths.",
+      "status": "done",
+      "triage": "ready-for-agent",
+      "priority": "high",
+      "claim": null,
+      "created_at": "2026-10-14T04:15:25Z",
+      "updated_at": "2026-10-14T07:22:49Z"
+    },
+    {
       "id": "TASK-105",
       "title": "Document seraph gate, seraph hook and seraph version in USING.md",
       "goal": "docs/USING.md documents install, doctor, board and ui, but never the three commands that make the claim gate usable: `seraph gate`, `seraph hook` and `seraph version`. A reader who wants to know whether their harness can enforce claims is told nothing.",
@@ -433,6 +475,50 @@
       "claim": null,
       "created_at": "2026-10-09T11:34:02Z",
       "updated_at": "2026-10-09T11:37:17Z"
+    },
+    {
+      "id": "TASK-138",
+      "title": "Kanban surfaces show every status column, empty ones included",
+      "goal": "The webui and TUI currently drop any status with no tasks, so a dispatcher reading the board sees only Backlog and Done and has nowhere to move work to; rendering all five status columns makes the board read as the track diagram DESIGN.md describes.",
+      "acceptance": "1. dashboard.View returns one Column per status in vocab order, empty ones included, so both surfaces render Backlog, To Do, In Progress, Review and Done even when a column has no tasks. 2. The Markdown snapshot is unchanged: it keeps skipping empty groups. 3. Both surfaces verified in a browser and a PTY with an empty column visible.",
+      "status": "done",
+      "priority": "medium",
+      "claim": null,
+      "created_at": "2026-10-14T04:48:34Z",
+      "updated_at": "2026-10-14T04:51:46Z"
+    },
+    {
+      "id": "TASK-140",
+      "title": "Webui: compose becomes modal, header rail becomes signal-head wordmark",
+      "goal": "When done, dispatchers create tasks through a native modal dialog instead of a permanent compose strip, and the header rail carries a signal-head Seraph wordmark that reports board liveness at a glance.",
+      "acceptance": "[\"1. The permanent compose strip is gone from the board view; a single Create task button in the header opens a native <dialog> with title, goal, done-when, priority, and triage fields, posting the same form action as before.\",\"2. The n key opens the modal; Esc closes it; submitting posts and closes; the modal is keyboard-reachable and focus is trapped by native dialog semantics.\",\"3. The header rail is a real <header class=rail> element (fixing the currently unclosed rail markup) with a three-lamp signal head inside the Seraph wordmark whose state follows the existing live/stale pulse logic.\",\"4. Both dark and light themes verified in a real browser: modal open, submit round-trip, n/Esc behaviour, lamp states, and the compose strip absent from the board.\"]",
+      "status": "done",
+      "priority": "medium",
+      "claim": null,
+      "created_at": "2026-10-14T08:19:37Z",
+      "updated_at": "2026-10-14T08:28:35Z"
+    },
+    {
+      "id": "TASK-141",
+      "title": "Webui smoke: modal round-trip",
+      "goal": "Proves the dialog submits a real create.",
+      "acceptance": "A new task appears in backlog.",
+      "status": "done",
+      "priority": "medium",
+      "claim": null,
+      "created_at": "2026-10-14T08:26:53Z",
+      "updated_at": "2026-10-14T08:27:52Z"
+    },
+    {
+      "id": "TASK-142",
+      "title": "Order board columns by workflow, backlog through done",
+      "goal": "When done, the board reads left-to-right in workflow order — backlog, todo, in_progress, review, done — on the browser panel, the terminal board and every snapshot, instead of the current in_progress-first order.",
+      "acceptance": "vocab.Statuses is in workflow order; webui, tui and snapshot column order follow it; gofmt/vet/test green.",
+      "status": "done",
+      "priority": "medium",
+      "claim": null,
+      "created_at": "2026-10-14T08:34:02Z",
+      "updated_at": "2026-10-14T08:35:51Z"
     },
     {
       "id": "TASK-125",
