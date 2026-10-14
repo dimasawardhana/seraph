@@ -2,26 +2,6 @@
 
 _Written by Seraph. Do not edit — this file is replaced on every change._
 
-## Backlog
-
-### TASK-132 · Commit the TASK-131 hook-repair work and its board records
-
-> **Goal:** The hook-repair fix in internal/installer is green and verified but sits uncommitted with its tests, so a clone gets the tree that still writes inert gates and reports them installed; land the source, the tests and the re-rendered snapshots in one commit.
-- priority: high
-- triage: ready-for-agent
-- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T00:58:48Z)
-- updated: 2026-10-14T00:28:48Z
-references:
-  - internal/installer/hooks.go
-  - internal/installer/hooks_test.go
-
-> **Done when:** 1. internal/installer/hooks.go and hooks_test.go are committed, with a diff confirmed non-empty first.
-> **Done when:** 2. A clean clone of the commit builds, vets and tests green.
-> **Done when:** 3. Nothing is pushed; origin is left where it is unless the owner says otherwise.
-> **Done when:** 4. The board snapshots land so the committed board matches state.db.
-> **Done when:** 5. Done through the board with the claim held by the session that did the work.
-
-
 ## Done
 
 ### TASK-101 · Sync ROADMAP.md with shipped scope
@@ -341,6 +321,24 @@ references:
 > **Done when:** (a) mentionsSeraph keyed on the literal string "seraph gate", which appears only when the binary is named seraph. Install run from a renamed or relocated binary could not recognise the entry it had just written and appended a duplicate on every pass. It now keys on the constant `gate --harness` signature every install-written entry carries. Same class TASK-108 fixed for omp, one target wider.
 > **Done when:** (b) mergeJSONHook re-marshalled the document and compared it against the file as read, but wrote the file with a trailing newline — so the comparison never matched and `unchanged` was unreachable for every JSON target. Masked until now by the early return removed by criterion 2. Both comparison sites now trim the trailing newline.
 > **Done when:** SCOPE, RECORDED RATHER THAN IMPLIED. Whether a harness actually invokes the hook it now correctly contains remains unproven for every target but omp: the `verified` registry still holds exactly one entry and nothing here changes that. A correct file is not a refusal observed — TASK-113's distinction, which still stands. Gemini's `replace` is matched alongside write_file; Cursor's timeout unit was not established from its reference, so none is written and the harness default applies.
+
+### TASK-132 · Commit the TASK-131 hook-repair work and its board records
+
+> **Goal:** The hook-repair fix in internal/installer is green and verified but sits uncommitted with its tests, so a clone gets the tree that still writes inert gates and reports them installed; land the source, the tests and the re-rendered snapshots in one commit.
+- priority: high
+- triage: ready-for-agent
+- updated: 2026-10-14T00:29:50Z
+references:
+  - internal/installer/hooks.go
+  - internal/installer/hooks_test.go
+
+> **Done when:** 1. internal/installer/hooks.go and hooks_test.go are committed, with a diff confirmed non-empty first. [MET: diffstat read before committing — 482 insertions, 53 deletions across the two files. Commit 273a258 'Repair hook commands install wrote and could not fix', message carrying the four fixes and the two test-found defects.]
+> **Done when:** 2. A clean clone of the commit builds, vets and tests green. [MET: `git clone --no-local` of the repository at 0051a6d into a temp dir; gofmt -l empty on ./internal and main.go, go vet ./... clean, go test ./... -count=1 green across board, db, doctor, gate, installer, mcp and tui. Clone removed afterwards.]
+> **Done when:** 3. Nothing is pushed; origin is left where it is unless the owner says otherwise. [MET: origin/master still at 3607054, master at 0051a6d — `git status -sb` reports 'ahead 11'. No push run. This matches TASK-123 criterion 3 and TASK-127, which both left origin behind deliberately.]
+> **Done when:** 4. The board snapshots land so the committed board matches state.db. [MET: commit 0051a6d 'Board snapshots for TASK-131 and TASK-132' carries exactly .seraph/KANBAN.md and .seraph/board.json. Kept a separate commit, following TASK-125 and TASK-127, so the source change is not interleaved with a render. `git status --short` is empty afterwards. NOTE, the same one-step lag TASK-125 and TASK-127 recorded: closing this task is itself a board mutation, so the two snapshots re-render once more and sit uncommitted by exactly one render. That is structural, not a gap in this task — committing the render that includes this close would require holding the claim after closing, which the server does not allow.]
+> **Done when:** 5. Done through the board with the claim held by the session that did the work. [MET: claimed as omp, session 01a13584-f4a2-7089-9bea-7b1325675c55. Both commits were made while that claim was live, which is why the gate allowed them.]
+> **Done when:** WHAT IS IN THE TWO COMMITS. 273a258: the hook-repair fix recorded under TASK-131 — the health report distinguishing a command that cannot run, install rewriting a stale command instead of reporting unchanged, the Gemini timeout and matcher, Cursor's native schema, and the two further defects the new tests found (mentionsSeraph keying on the literal 'seraph gate', and the trailing-newline comparison that made 'unchanged' unreachable). 0051a6d: the rendered board. Neither commit touches any other path.
+> **Done when:** STILL OPEN, AND NOT CLAIMED BY THIS TASK. The verified registry still holds one entry, omp. Whether any other harness invokes the hook it now correctly contains remains unproven, and a correct file is not a refusal observed — TASK-113's distinction, recorded on TASK-104 criterion 6(d) with what would close it. The /tmp/seraph-defect-plan.md that TASK-110 named as holding 'separate work' is still absent, so that thread has no owner.
 
 ### TASK-105 · Document seraph gate, seraph hook and seraph version in USING.md
 

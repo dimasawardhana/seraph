@@ -1,26 +1,6 @@
 {
   "tasks": [
     {
-      "id": "TASK-132",
-      "title": "Commit the TASK-131 hook-repair work and its board records",
-      "goal": "The hook-repair fix in internal/installer is green and verified but sits uncommitted with its tests, so a clone gets the tree that still writes inert gates and reports them installed; land the source, the tests and the re-rendered snapshots in one commit.",
-      "acceptance": "1. internal/installer/hooks.go and hooks_test.go are committed, with a diff confirmed non-empty first.\n2. A clean clone of the commit builds, vets and tests green.\n3. Nothing is pushed; origin is left where it is unless the owner says otherwise.\n4. The board snapshots land so the committed board matches state.db.\n5. Done through the board with the claim held by the session that did the work.",
-      "status": "backlog",
-      "triage": "ready-for-agent",
-      "priority": "high",
-      "references": [
-        "internal/installer/hooks.go",
-        "internal/installer/hooks_test.go"
-      ],
-      "claim": {
-        "harness": "omp",
-        "session": "01a13584-f4a2-7089-9bea-7b1325675c55",
-        "expires": "2026-10-14T00:58:48Z"
-      },
-      "created_at": "2026-10-14T00:28:41Z",
-      "updated_at": "2026-10-14T00:28:48Z"
-    },
-    {
       "id": "TASK-101",
       "title": "Sync ROADMAP.md with shipped scope",
       "goal": "ROADMAP.md describes v1 as six MCP tools, but internal/ also ships webui, dashboard, tui, vocab and gate. Either the roadmap records that scope as carried forward with the reason it is not in v1, or the scope line is corrected. The roadmap must not silently disagree with the tree.",
@@ -227,6 +207,22 @@
       "claim": null,
       "created_at": "2026-10-13T17:06:18Z",
       "updated_at": "2026-10-13T17:16:19Z"
+    },
+    {
+      "id": "TASK-132",
+      "title": "Commit the TASK-131 hook-repair work and its board records",
+      "goal": "The hook-repair fix in internal/installer is green and verified but sits uncommitted with its tests, so a clone gets the tree that still writes inert gates and reports them installed; land the source, the tests and the re-rendered snapshots in one commit.",
+      "acceptance": "1. internal/installer/hooks.go and hooks_test.go are committed, with a diff confirmed non-empty first. [MET: diffstat read before committing — 482 insertions, 53 deletions across the two files. Commit 273a258 'Repair hook commands install wrote and could not fix', message carrying the four fixes and the two test-found defects.]\n2. A clean clone of the commit builds, vets and tests green. [MET: `git clone --no-local` of the repository at 0051a6d into a temp dir; gofmt -l empty on ./internal and main.go, go vet ./... clean, go test ./... -count=1 green across board, db, doctor, gate, installer, mcp and tui. Clone removed afterwards.]\n3. Nothing is pushed; origin is left where it is unless the owner says otherwise. [MET: origin/master still at 3607054, master at 0051a6d — `git status -sb` reports 'ahead 11'. No push run. This matches TASK-123 criterion 3 and TASK-127, which both left origin behind deliberately.]\n4. The board snapshots land so the committed board matches state.db. [MET: commit 0051a6d 'Board snapshots for TASK-131 and TASK-132' carries exactly .seraph/KANBAN.md and .seraph/board.json. Kept a separate commit, following TASK-125 and TASK-127, so the source change is not interleaved with a render. `git status --short` is empty afterwards. NOTE, the same one-step lag TASK-125 and TASK-127 recorded: closing this task is itself a board mutation, so the two snapshots re-render once more and sit uncommitted by exactly one render. That is structural, not a gap in this task — committing the render that includes this close would require holding the claim after closing, which the server does not allow.]\n5. Done through the board with the claim held by the session that did the work. [MET: claimed as omp, session 01a13584-f4a2-7089-9bea-7b1325675c55. Both commits were made while that claim was live, which is why the gate allowed them.]\n\nWHAT IS IN THE TWO COMMITS. 273a258: the hook-repair fix recorded under TASK-131 — the health report distinguishing a command that cannot run, install rewriting a stale command instead of reporting unchanged, the Gemini timeout and matcher, Cursor's native schema, and the two further defects the new tests found (mentionsSeraph keying on the literal 'seraph gate', and the trailing-newline comparison that made 'unchanged' unreachable). 0051a6d: the rendered board. Neither commit touches any other path.\n\nSTILL OPEN, AND NOT CLAIMED BY THIS TASK. The verified registry still holds one entry, omp. Whether any other harness invokes the hook it now correctly contains remains unproven, and a correct file is not a refusal observed — TASK-113's distinction, recorded on TASK-104 criterion 6(d) with what would close it. The /tmp/seraph-defect-plan.md that TASK-110 named as holding 'separate work' is still absent, so that thread has no owner.",
+      "status": "done",
+      "triage": "ready-for-agent",
+      "priority": "high",
+      "references": [
+        "internal/installer/hooks.go",
+        "internal/installer/hooks_test.go"
+      ],
+      "claim": null,
+      "created_at": "2026-10-14T00:28:41Z",
+      "updated_at": "2026-10-14T00:29:50Z"
     },
     {
       "id": "TASK-105",
