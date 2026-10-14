@@ -16,25 +16,6 @@
       "updated_at": "2026-10-14T01:07:18Z"
     },
     {
-      "id": "TASK-135",
-      "title": "Install the rebuilt binary and commit the final render",
-      "goal": "The token-cost fix is committed at ac8c3c9 but the installed binary at ~/go/bin/seraph still predates it, so the harness is running the old render, and closing TASK-134 re-rendered the snapshots one more time; land both so the running binary and the committed board match the fix.",
-      "acceptance": "1. ~/go/bin/seraph is rebuilt from the committed tree and get_board_summary through it returns the compact board.\n2. The re-rendered .seraph/KANBAN.md and .seraph/board.json are committed and the tree is clean.\n3. Nothing is pushed.\n4. Done through the board with the claim held by the session that did the work.",
-      "status": "backlog",
-      "triage": "ready-for-agent",
-      "priority": "high",
-      "references": [
-        "internal/board/render.go"
-      ],
-      "claim": {
-        "harness": "omp",
-        "session": "01a13584-f4a2-7089-9bea-7b1325675c55",
-        "expires": "2026-10-14T02:23:22Z"
-      },
-      "created_at": "2026-10-14T01:53:14Z",
-      "updated_at": "2026-10-14T01:53:22Z"
-    },
-    {
       "id": "TASK-101",
       "title": "Sync ROADMAP.md with shipped scope",
       "goal": "ROADMAP.md describes v1 as six MCP tools, but internal/ also ships webui, dashboard, tui, vocab and gate. Either the roadmap records that scope as carried forward with the reason it is not in v1, or the scope line is corrected. The roadmap must not silently disagree with the tree.",
@@ -274,6 +255,21 @@
       "claim": null,
       "created_at": "2026-10-14T01:31:16Z",
       "updated_at": "2026-10-14T01:52:56Z"
+    },
+    {
+      "id": "TASK-135",
+      "title": "Install the rebuilt binary and commit the final render",
+      "goal": "The token-cost fix is committed at ac8c3c9 but the installed binary at ~/go/bin/seraph still predates it, so the harness is running the old render, and closing TASK-134 re-rendered the snapshots one more time; land both so the running binary and the committed board match the fix.",
+      "acceptance": "1. ~/go/bin/seraph is rebuilt from the committed tree and get_board_summary through it returns the compact board. [MET: rebuilt from HEAD (ac8c3c9) to ~/go/bin/seraph, then driven over stdio as a harness would, against a scratch copy of this board's state.db including its WAL. get_board_summary returned 19,127 bytes (18.7 KB, about 4,780 tokens) and .seraph/KANBAN.md was 19,210 bytes — byte-identical to the response, the same invariant checked when the change landed. The same probe against the binary that was installed before this task (built from 273a258) returned 143,069 bytes, so the running binary really was serving the old render and now is not.]\n2. The re-rendered .seraph/KANBAN.md and .seraph/board.json are committed and the tree is clean. [MET: commit 2c92796 'Board snapshots: TASK-134 closed, TASK-135 recorded'; `git status --short` printed nothing afterwards.]\n3. Nothing is pushed. [MET: origin/master still at 3607054; master is ahead 15 and no push was run.]\n4. Done through the board with the claim held by the session that did the work. [MET: claimed as omp, session 01a13584-f4a2-7089-9bea-7b1325675c55. Closing this task re-renders the snapshots once more, and that final render is committed immediately after from outside the gate — the structural one-step lag TASK-125, TASK-127 and TASK-132 all recorded: a board whose only remaining task is unclaimed cannot be written to by a claimless session.]\n\nSIZE, END TO END, ON THIS BOARD. Committed board before the change: 143.6 KB. After: 19.2 KB. The response a harness now pays per call fell from about 35,900 tokens to about 4,780.",
+      "status": "done",
+      "triage": "ready-for-agent",
+      "priority": "high",
+      "references": [
+        "internal/board/render.go"
+      ],
+      "claim": null,
+      "created_at": "2026-10-14T01:53:14Z",
+      "updated_at": "2026-10-14T01:53:52Z"
     },
     {
       "id": "TASK-105",

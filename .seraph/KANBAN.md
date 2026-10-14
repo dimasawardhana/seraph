@@ -30,21 +30,6 @@ references:
 > **Done when:** THE DESIGN QUESTION, which is the reason this is recorded rather than fixed on sight. gate.go's default is allow-with-a-reason, and that is deliberate in two places: the no-session branch (gate.go:101-105) says 'Refusing here would be a guess, and a wrong guess is a deadlock', and the unreadable-board branch (gate.go:94-96) fails open so a database problem cannot freeze work. Inverting the default — refuse anything not recognised as a read — matches the principle the project keeps stating ('a hook file on disk is not evidence of anything'; TASK-113) but makes the gate depend on knowing every harness's tool names, which install cannot do for MCP-provided or renamed tools. The honest options are: (a) invert to refuse-unless-known-read, (b) keep allow-by-default but require the harness to declare its write tools at install, or (c) record it as an accepted limit and say so in docs/USING.md rather than implying the gate is exhaustive. Nothing in the current code or docs admits the limit exists.
 > **Done when:** SCOPE NOTE. The three omp names are what was probed; the defect is the classification strategy, not those three strings. Adding 'eval', 'task' and 'hub' to writeTools would close the observed instances and leave the class open, which is the mistake TASK-131 was about, one level up.
 
-### TASK-135 · Install the rebuilt binary and commit the final render
-
-> **Goal:** The token-cost fix is committed at ac8c3c9 but the installed binary at ~/go/bin/seraph still predates it, so the harness is running the old render, and closing TASK-134 re-rendered the snapshots one more time; land both so the running binary and the committed board match the fix.
-- priority: high
-- triage: ready-for-agent
-- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T02:23:22Z)
-- updated: 2026-10-14T01:53:22Z
-references:
-  - internal/board/render.go
-
-> **Done when:** 1. ~/go/bin/seraph is rebuilt from the committed tree and get_board_summary through it returns the compact board.
-> **Done when:** 2. The re-rendered .seraph/KANBAN.md and .seraph/board.json are committed and the tree is clean.
-> **Done when:** 3. Nothing is pushed.
-> **Done when:** 4. Done through the board with the claim held by the session that did the work.
-
 
 ## Done
 
@@ -405,6 +390,21 @@ references:
 > **Done when:** 5. KANBAN.md stays rendered and committed, doctor still reports it current, and a clone still restores from the snapshots. [MET: KANBAN.md and board.json are still written by Sync on every mutation; doctor compares on-disk bytes against a fresh render and reports current; the seeding path is untouched and seed_test.go's round-trip still passes. board.json is unchanged — it is the machine-readable record and get_task reads the same fields.]
 > **Done when:** 6. Tests pin the compact render and the filters; gofmt -l empty, go vet ./... clean, go test ./... -count=1 green. [MET: seven tests in a new internal/board/render_test.go (closed tasks compacted, open work never compacted, FullDone restores the record, the zero value renders every task, status_filter limits, OmitDone drops closed work, and the saving is proportional rather than incidental) plus three in internal/mcp/tools_test.go (the response is the rendered file byte for byte, status_filter, include_done). gofmt -l empty, go vet ./... clean, go test ./... -count=1 green across board, db, doctor, gate, installer, mcp, tui. ONE DEFECT CAUGHT BY THESE TESTS AND FIXED HERE: my first edit dropped the `### ID · title` heading from OPEN tasks while adding the compact branch, which the status-filter and OmitDone tests failed on. Nothing else in the suite noticed, because no prior test asserted markdown content.]
 > **Done when:** SCOPE. The default render is now compact for closed tasks; a caller that wants the old full-history render passes include_done. What this does NOT do is stop a task from growing: a single open task with 10 KB of acceptance prose still returns 10 KB, and 200 done tasks still cost their headings. Both are proportional to real content rather than to history. board.json is deliberately left full, because it is the snapshot a clone seeds from and the shape get_task and doctor read.
+
+### TASK-135 · Install the rebuilt binary and commit the final render
+
+> **Goal:** The token-cost fix is committed at ac8c3c9 but the installed binary at ~/go/bin/seraph still predates it, so the harness is running the old render, and closing TASK-134 re-rendered the snapshots one more time; land both so the running binary and the committed board match the fix.
+- priority: high
+- triage: ready-for-agent
+- updated: 2026-10-14T01:53:52Z
+references:
+  - internal/board/render.go
+
+> **Done when:** 1. ~/go/bin/seraph is rebuilt from the committed tree and get_board_summary through it returns the compact board. [MET: rebuilt from HEAD (ac8c3c9) to ~/go/bin/seraph, then driven over stdio as a harness would, against a scratch copy of this board's state.db including its WAL. get_board_summary returned 19,127 bytes (18.7 KB, about 4,780 tokens) and .seraph/KANBAN.md was 19,210 bytes — byte-identical to the response, the same invariant checked when the change landed. The same probe against the binary that was installed before this task (built from 273a258) returned 143,069 bytes, so the running binary really was serving the old render and now is not.]
+> **Done when:** 2. The re-rendered .seraph/KANBAN.md and .seraph/board.json are committed and the tree is clean. [MET: commit 2c92796 'Board snapshots: TASK-134 closed, TASK-135 recorded'; `git status --short` printed nothing afterwards.]
+> **Done when:** 3. Nothing is pushed. [MET: origin/master still at 3607054; master is ahead 15 and no push was run.]
+> **Done when:** 4. Done through the board with the claim held by the session that did the work. [MET: claimed as omp, session 01a13584-f4a2-7089-9bea-7b1325675c55. Closing this task re-renders the snapshots once more, and that final render is committed immediately after from outside the gate — the structural one-step lag TASK-125, TASK-127 and TASK-132 all recorded: a board whose only remaining task is unclaimed cannot be written to by a claimless session.]
+> **Done when:** SIZE, END TO END, ON THIS BOARD. Committed board before the change: 143.6 KB. After: 19.2 KB. The response a harness now pays per call fell from about 35,900 tokens to about 4,780.
 
 ### TASK-105 · Document seraph gate, seraph hook and seraph version in USING.md
 
