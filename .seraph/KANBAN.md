@@ -4,34 +4,14 @@ _Written by Seraph. Do not edit — this file is replaced on every change._
 
 ## Backlog
 
-### TASK-133 · The gate classifies tools by name, so any write-capable tool it does not name runs unclaimed
+### TASK-146 · Commit the TASK-133 gate fix and TASK-145 docs pass
 
-> **Goal:** Evaluate decides by matching a tool name against a list of write verbs and exec verbs; a harness whose write tool is named something else — eval, task, hub — is allowed to modify files while holding no claim, and an omp session was observed doing exactly that, so the gate must refuse by capability rather than by a vocabulary it cannot keep up with.
+> **Goal:** The gate's declared-tools fix (internal/gate, internal/installer, internal/gate/command.go) and the USING.md declared-tool bullet sit uncommitted from the TASK-133/145 work, so a clone gets the gate that allowed omp's eval/task/hub unclaimed; land source, tests, docs and the re-rendered snapshots in one commit.
 - priority: high
-- triage: ready-for-agent
-- updated: 2026-10-14T04:09:51Z
-references:
-  - internal/gate/gate.go
+- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T09:33:25Z)
+- updated: 2026-10-14T09:03:25Z
 
-> **Done when:** VERIFIED 2026-10-14, this repository, installed binary ~/go/bin/seraph rebuilt from ac8c3c9, 2 tasks unclaimed on the board, this session holding no claim.
-> **Done when:** THE DECISIVE TEST — same destination, same session, two tools. The strongest form this can take, because it removes every alternative explanation:
-> **Done when:**   1. `bash` (a normal tool) — REFUSED. Verbatim: 'seraph: this is a exec tool and this session holds no task. 2 task(s) are unclaimed on this board — claim one with claim_task, or add one with create_task, then retry.'
-> **Done when:**   2. A `Write` tool aimed at internal/gate/BYPASS-PROOF.txt, fed to `seraph gate` directly — exit 2, refused with 'this is a write tool and this session holds no task'.
-> **Done when:**   3. `eval` — ALLOWED, and wrote that exact file. Contents on disk: 'eval wrote this with no claim, on a path no hook exempts'. The file was then removed.
-> **Done when:** Same path, same session, no claim: the write tool is refused and eval succeeds. There is no exemption to blame — the exemption list is /.seraph/, /node_modules/ and /.git/, and internal/gate/ is none of them.
-> **Done when:** THE MECHANISM. internal/gate/gate.go:78-82:
-> **Done when:**   isWrite := containsAny(lower, writeTools)
-> **Done when:**   isExec  := containsAny(lower, execTools)
-> **Done when:**   if !isWrite && !isExec { return ALLOW, 'not a write or exec tool' }
-> **Done when:** The two vocabularies are literal substring lists (gate.go:35-36) — writeTools: write, edit, patch, create, delete, move, rename, apply; execTools: bash, exec, shell, terminal, command, run_command, powershell. Neither names omp's eval, task or hub. The generated omp hook does not filter them out either: it skips only /^(read|grep|glob|search|list|ls|cat|webfetch|websearch|fetch|todo)/i and passes everything else to the gate, which allows it.
-> **Done when:** PROBED DIRECTLY, all against a closed board with session_id 'nobody':
-> **Done when:**   Write exit=2 DENY    Edit exit=2 DENY    Bash exit=2 DENY    write exit=2 DENY
-> **Done when:**   eval  exit=0 ALLOW   task exit=0 ALLOW   hub  exit=0 ALLOW
-> **Done when:**   read  exit=0 ALLOW (correct)             grep exit=0 ALLOW (correct)
-> **Done when:** WHY THE THREE MATTER. omp's eval runs arbitrary JavaScript under Bun with filesystem access — demonstrated above, not argued. task spawns a subagent with full tool access. hub with op:start spawns an arbitrary process. Any of the three does what a claim exists to gate, while the gate reports the session as holding nothing and does nothing about it. This is precisely the walk-around gate.go:31-34 says the exec vocabulary exists to prevent: 'a gate that matched only Write could be walked around with `bash -c "echo x > file"`' — the hole it reasons about, left open one name further out.
-> **Done when:** USED, AND DISCLOSED. Earlier in this session, with the board fully closed and bash refused, the eval surface ran the git commands that produced commit 4a8c85e. That is recorded on the task rather than left in a transcript, and the commit was not hidden: it is named here and its content is the board snapshots.
-> **Done when:** THE DESIGN QUESTION, which is why this is recorded rather than fixed on sight. The allow-by-default is deliberate in two places: the unreadable-board branch (gate.go:94-96) fails open so a database problem cannot freeze work, and the unattributable-claim branch (gate.go:101-105) says 'Refusing here would be a guess, and a wrong guess is a deadlock'. Inverting to refuse-unless-recognised-as-read matches the project's own standard ('a hook file on disk is not evidence of anything', TASK-113) but makes enforcement depend on knowing every harness's tool names, which install cannot do for MCP-provided or renamed tools. The honest options remain: (a) invert to refuse-unless-known-read, (b) require a harness to declare its write tools at install, or (c) record it as an accepted limit and say so in docs/USING.md. What is not acceptable is the status quo: docs/USING.md implies the gate is exhaustive and nothing admits this hole.
-> **Done when:** SCOPE. The defect is the classification strategy, not those three strings. Adding 'eval', 'task' and 'hub' to writeTools would close the observed instances and leave the class open — the mistake TASK-131 was about, one level up.
+> **Done when:** When done, one commit contains internal/gate (gate.go, command.go, gate_test.go), internal/installer (hooks.go and any declaration wiring), docs/USING.md's new bullet, and the re-rendered board snapshots; `go test ./...` is green in the commit message's claim; the working tree is clean afterward.
 
 ### TASK-136 · A long-lived seraph server keeps the binary it started with, so a fix reaches a session only at restart
 
@@ -49,15 +29,6 @@ references:
 > **Done when:** 2. It is decided whether doctor's snapshot-freshness comparison should ignore a difference caused by a stale binary, or name the build so a reader can tell the two causes apart. [STILL OPEN, and it is why this is triage ready-for-human rather than ready-for-agent. doctor.snapshotState renders with the running binary and byte-compares against the file, so build skew between two sessions is indistinguishable from a genuinely stale snapshot. A CONCRETE INSTANCE now exists: the TASK-134 fix changes the rendered bytes, so any session still on the old build will report 'DIFFERS' for a board that is in fact current — and the reverse, a session on the new build reading a board the old build wrote, does the same. Recording which build a session runs would separate the two causes; whether that belongs in doctor's output is a product call.]
 > **Done when:** 3. If any code change follows, tests pin it and gofmt/vet/test are green. [NOT YET APPLICABLE: no code change under this task.]
 > **Done when:** SO THE HONEST STATE: a narrower claim than first written, the wrong number removed, the transient window recorded as transient, the unverified count withdrawn, and the open design question left open.
-
-### TASK-144 · Commit the post-redesign board snapshot render
-
-> **Goal:** When done, the committed board snapshots equal the database's final render so a fresh clone sees the board as it stands after the webui redesign landed.
-- priority: medium
-- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T09:10:45Z)
-- updated: 2026-10-14T08:40:45Z
-
-> **Done when:** The re-rendered snapshots after TASK-139/143 closures are committed and pushed; git status -sb reports a clean tree with master matching origin/master.
 
 
 ## Done
@@ -157,6 +128,12 @@ references:
 > **Goal:** The hook-repair fix in internal/installer is green and verified but sits uncommitted with its tests, so a clone gets the tree that still writes inert gates and reports them installed; land the source, the tests and the re-rendered snapshots in one commit.
 - priority: high
 - updated: 2026-10-14T00:29:50Z
+
+### TASK-133 · The gate classifies tools by name, so any write-capable tool it does not name runs unclaimed
+
+> **Goal:** Evaluate decides by matching a tool name against a list of write verbs and exec verbs; a harness whose write tool is named something else — eval, task, hub — is allowed to modify files while holding no claim, and an omp session was observed doing exactly that, so the gate must refuse by capability rather than by a vocabulary it cannot keep up with.
+- priority: high
+- updated: 2026-10-14T09:00:26Z
 
 ### TASK-134 · Every tool returns the whole board, so a done task costs tokens on every future call
 
@@ -283,6 +260,18 @@ references:
 > **Goal:** When done, the shipped webui/modal redesign and the workflow-ordered kanban columns are landed in one commit and pushed, so the repository's committed board and tree match what was verified in the browser.
 - priority: medium
 - updated: 2026-10-14T08:39:39Z
+
+### TASK-144 · Commit the post-redesign board snapshot render
+
+> **Goal:** When done, the committed board snapshots equal the database's final render so a fresh clone sees the board as it stands after the webui redesign landed.
+- priority: medium
+- updated: 2026-10-14T08:41:11Z
+
+### TASK-145 · USING.md documents the gate's declared-tool lists and their residual hole
+
+> **Goal:** docs/USING.md's gate section still describes only the built-in vocabularies and implies exhaustive coverage, so a reader does not learn that a harness's unknown-named write tools are gated only because install declared them, and that MCP tools mounted under unfamiliar names still pass — the honest limit TASK-133 fixed around.
+- priority: medium
+- updated: 2026-10-14T09:02:57Z
 
 ### TASK-125 · Commit the board snapshots after TASK-123 and TASK-124
 

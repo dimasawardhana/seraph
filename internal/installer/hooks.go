@@ -504,12 +504,22 @@ func timeoutFor(harness string) int {
 // Claude Code, Codex and Copilot CLI share the Claude tool names. Gemini names tools
 // write_file/replace/run_shell_command and matches them as a regex. Cursor matches Shell
 // and Write. Kiro needs no entry: it is Unsupported and never reaches this function.
+//
+// omp's hook is generated code with its own filter, so matcherFor is never called for
+// it; the case below panics if that ever changes. Keep this switch in step with
+// gate.DeclaredTools: the matcher decides which tools even reach the gate, and the
+// declaration decides what happens to the ones that arrive.
 func matcherFor(harness string) string {
 	switch harness {
 	case "Gemini CLI":
 		return "write_file|replace|run_shell_command"
 	case "Cursor":
 		return "Shell|Write"
+	case "omp":
+		// omp's hook is generated code with its own filter; it passes every tool the
+		// gate declares to the gate. If this branch is ever reached, something
+		// rewired the hook layer and the install should stop rather than guess.
+		panic("matcherFor: omp's hook is generated in ompHookSource; it takes no matcher")
 	default:
 		return "Write|Edit|MultiEdit|NotebookEdit|apply_patch|Bash|EditNotebook|BashOutput"
 	}

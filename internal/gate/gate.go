@@ -18,6 +18,17 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// DeclaredTools maps a gate harness token to the write and exec tool names that
+// harness actually exposes, in lower case. Anything on these lists is refused without a
+// live claim even though no built-in vocabulary knows the name — this is how omp's
+// eval, task and hub, which modify files and spawn agents, get gated.
+//
+// The table is the single source for the tool names a harness can reach the gate with;
+// installer.matcherFor decides which of them are even forwarded. Keep the two in step.
+var DeclaredTools = map[string][]string{
+	"omp": {"eval", "task", "hub"},
+}
+
 // Decision is the machine-readable answer a hook consumes.
 type Decision struct {
 	Allow  bool   `json:"allow"`
@@ -61,7 +72,9 @@ type Verdict struct {
 var seraphTools = []string{"mcp__seraph_", "seraph_", "xd://mcp__seraph"}
 
 // Evaluate decides whether a tool call named tool may run inside dir for session.
-func Evaluate(root, tool, session string, toolInput any) Verdict {
+// harness is the gate token the hook was installed under ("" when unknown); it selects
+// the harness's declared tool lists from DeclaredTools.
+func Evaluate(harness, root, tool, session string, toolInput any) Verdict {
 	// A harness may dispatch MCP tools through its own write tool, passing an xd://
 	// device path as the file argument. The tool name is then the harness's own, and the
 	// real target is in the payload. Checking only the tool name refused
@@ -77,6 +90,11 @@ func Evaluate(root, tool, session string, toolInput any) Verdict {
 	}
 	isWrite := containsAny(lower, writeTools)
 	isExec := containsAny(lower, execTools)
+	if declared, ok := DeclaredTools[harness]; ok {
+		if containsAny(lower, declared) {
+			isWrite = true
+		}
+	}
 	if !isWrite && !isExec {
 		return Verdict{Gate: Decision{Allow: true}, Reason: "not a write or exec tool"}
 	}

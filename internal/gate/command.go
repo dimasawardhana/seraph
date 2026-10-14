@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-
 	"strings"
 )
 
@@ -64,6 +63,11 @@ func Run(args []string, in io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	}
 
+	// The --harness flag is normalised to the gate token the hook was installed under,
+	// mirroring the installer's own naming: the hook says --harness omp, and the
+	// declared tool lists in the gate are keyed by exactly that.
+	harnessToken := strings.ToLower(strings.ReplaceAll(*harness, " ", ""))
+
 	input := any(nil)
 	for _, source := range []any{body.Input, body.InputAlt, body.Params} {
 		if m, ok := source.(map[string]any); ok && len(m) > 0 {
@@ -71,7 +75,7 @@ func Run(args []string, in io.Reader, stdout, stderr io.Writer) int {
 			break
 		}
 	}
-	verdict := Evaluate(root, toolName, sessionID, input)
+	verdict := Evaluate(harnessToken, root, toolName, sessionID, input)
 	if *explain {
 		fmt.Fprintln(stderr, "seraph gate:", verdict.Reason)
 		emit(stdout, verdict.Gate.Allow, verdict.Gate.Reason, verdict.Gate.Task, *harness)

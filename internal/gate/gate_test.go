@@ -55,7 +55,7 @@ func newBoard(t *testing.T, tasks ...task) string {
 func TestWriteAllowedWhenThisSessionHoldsTheClaim(t *testing.T) {
 	root := newBoard(t, task{id: "TASK-1", session: "s1", expires: time.Now().Add(time.Hour).Unix()})
 
-	got := Evaluate(root, "Write", "s1", nil)
+	got := Evaluate("", root, "Write", "s1", nil)
 
 	if !got.Gate.Allow {
 		t.Fatalf("expected allow, got refusal: %s", got.Gate.Reason)
@@ -68,7 +68,7 @@ func TestWriteAllowedWhenThisSessionHoldsTheClaim(t *testing.T) {
 func TestWriteRefusedWhenThisSessionHoldsNothing(t *testing.T) {
 	root := newBoard(t, task{id: "TASK-1"})
 
-	got := Evaluate(root, "Write", "s1", nil)
+	got := Evaluate("", root, "Write", "s1", nil)
 
 	if got.Gate.Allow {
 		t.Fatal("expected a refusal for a session holding no claim")
@@ -85,7 +85,7 @@ func TestRefusalDistinguishesAClaimHeldByAnotherSession(t *testing.T) {
 	heldElsewhere := newBoard(t, task{id: "TASK-1", session: "somebody-else", expires: time.Now().Add(time.Hour).Unix()})
 	emptyOfOthers := newBoard(t, task{id: "TASK-1"})
 
-	mismatch := Evaluate(heldElsewhere, "Write", "s1", nil)
+	mismatch := Evaluate("", heldElsewhere, "Write", "s1", nil)
 	if mismatch.Gate.Allow {
 		t.Fatal("expected a refusal when the claim belongs to another session")
 	}
@@ -95,7 +95,7 @@ func TestRefusalDistinguishesAClaimHeldByAnotherSession(t *testing.T) {
 
 	// The control matters as much as the case: an unclaimed board must NOT produce the
 	// new sentence, or every ordinary refusal would accuse the caller of a mismatch.
-	ordinary := Evaluate(emptyOfOthers, "Write", "s1", nil)
+	ordinary := Evaluate("", emptyOfOthers, "Write", "s1", nil)
 	if strings.Contains(ordinary.Gate.Reason, "held by another session") {
 		t.Errorf("an unclaimed board must not imply an identity mismatch, got %q", ordinary.Gate.Reason)
 	}
@@ -104,7 +104,7 @@ func TestRefusalDistinguishesAClaimHeldByAnotherSession(t *testing.T) {
 func TestRefusalCarriesTheSameSentenceToExecTools(t *testing.T) {
 	root := newBoard(t, task{id: "TASK-1", session: "somebody-else", expires: time.Now().Add(time.Hour).Unix()})
 
-	got := Evaluate(root, "Bash", "s1", nil)
+	got := Evaluate("", root, "Bash", "s1", nil)
 
 	if got.Gate.Allow {
 		t.Fatal("expected a refusal for an exec tool with no claim")
@@ -119,7 +119,7 @@ func TestExpiredClaimCountsAsUnclaimed(t *testing.T) {
 	past := time.Now().Add(-time.Minute).Unix()
 	root := newBoard(t, task{id: "TASK-1", session: "somebody-else", expires: past})
 
-	got := Evaluate(root, "Write", "s1", nil)
+	got := Evaluate("", root, "Write", "s1", nil)
 
 	if got.Gate.Allow {
 		t.Fatal("expected a refusal: the only claim has expired")
@@ -137,7 +137,7 @@ func TestExpiredClaimCountsAsUnclaimed(t *testing.T) {
 func TestUnattributableClaimAllowsRatherThanGuesses(t *testing.T) {
 	root := newBoard(t, task{id: "TASK-1", session: "somebody-else", expires: time.Now().Add(time.Hour).Unix()})
 
-	got := Evaluate(root, "Write", "", nil)
+	got := Evaluate("", root, "Write", "", nil)
 
 	if !got.Gate.Allow {
 		t.Fatalf("expected allow when no session can be identified, got %q", got.Gate.Reason)
@@ -153,14 +153,14 @@ func TestSeraphOwnToolsAreNeverGated(t *testing.T) {
 	root := newBoard(t)
 
 	for _, tool := range []string{"mcp__seraph_create_task", "mcp__seraph_claim_task", "xd://mcp__seraph_release_task"} {
-		if got := Evaluate(root, tool, "", nil); !got.Gate.Allow {
+		if got := Evaluate("", root, tool, "", nil); !got.Gate.Allow {
 			t.Errorf("%s must never be gated, got refusal: %s", tool, got.Gate.Reason)
 		}
 	}
 
 	// And the same call arriving through a harness's own write tool, aimed at the device.
 	input := map[string]any{"path": "xd://mcp__seraph_get_board_summary"}
-	if got := Evaluate(root, "Write", "", input); !got.Gate.Allow {
+	if got := Evaluate("", root, "Write", "", input); !got.Gate.Allow {
 		t.Errorf("a write aimed at a seraph device must not be gated, got refusal: %s", got.Gate.Reason)
 	}
 }
@@ -169,7 +169,7 @@ func TestReadToolsAreNeverGated(t *testing.T) {
 	root := newBoard(t)
 
 	for _, tool := range []string{"read", "grep", "glob", "list"} {
-		if got := Evaluate(root, tool, "", nil); !got.Gate.Allow {
+		if got := Evaluate("", root, tool, "", nil); !got.Gate.Allow {
 			t.Errorf("%s must never need a claim, got refusal: %s", tool, got.Gate.Reason)
 		}
 	}
@@ -189,5 +189,28 @@ func TestSeraphSnapshotsAreExempt(t *testing.T) {
 	}
 	if PathExempt(filepath.FromSlash("internal/gate/gate.go")) {
 		t.Error("an ordinary source file must not be exempt")
+	}
+}
+
+// A harness whose write tools the built-in vocabularies cannot name — omp's eval, task
+// and hub — was observed writing with no claim while the gate reported the board clean.
+// The declared lists close exactly that hole, and nothing else: an unknown tool on an
+// unknown harness is still allowed, because refusing it would gate every MCP server the
+// harness happens to mount.
+func TestDeclaredToolsAreGated(t *testing.T) {
+	root := newBoard(t, task{id: "TASK-1", session: "s1", expires: 1 << 40})
+	for _, tool := range []string{"eval", "task", "hub", "Task"} {
+		if got := Evaluate("omp", root, tool, "other", nil); got.Gate.Allow {
+			t.Errorf("declared omp tool %q must need a claim when this session holds none", tool)
+		}
+	}
+	if got := Evaluate("omp", root, "eval", "s1", nil); !got.Gate.Allow {
+		t.Errorf("declared omp tool must pass once the session holds a claim: %s", got.Gate.Reason)
+	}
+	if got := Evaluate("claude-code", root, "eval", "", nil); !got.Gate.Allow {
+		t.Errorf("a declaration for omp must not leak into another harness: %s", got.Gate.Reason)
+	}
+	if got := Evaluate("", root, "some.unknown.mcp.tool", "", nil); !got.Gate.Allow {
+		t.Errorf("an unknown tool on an unknown harness must stay allowed: %s", got.Gate.Reason)
 	}
 }

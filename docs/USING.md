@@ -317,7 +317,7 @@ Refused, because that session holds nothing:
 ```
 exit status 2
 
-Four things worth knowing before you rely on it:
+Five things worth knowing before you rely on it:
 
 - **Reading is never gated.** `read`, `grep`, `glob` and the rest pass with no claim at all. A
   harness is entitled to look before it leaps.
@@ -335,6 +335,16 @@ Four things worth knowing before you rely on it:
   do not. With no session the gate allows only when someone holds a claim *and* nothing is unclaimed;
   if any task is sitting unclaimed it denies, which routes the agent to the board instead of past it.
   A wrong guess here would be a deadlock, which is why the no-session case is this narrow.
+- **Coverage is by name, not by capability — unless install declared it.** At install time seraph
+  records the write and exec tool names each harness actually exposes (`gate.DeclaredTools`, keyed
+  by the harness token the hook was installed under), and the gate refuses any of those names
+  without a claim even though no built-in vocabulary knows it — this is how omp's `eval`, `task`
+  and `hub` are gated. A tool name in neither the built-in lists nor the declared list is *allowed*
+  through: refusing an unrecognized name would gate every MCP tool the harness has mounted, most of
+  which cannot touch files. The residual hole is therefore an undeclared harness (one whose hook
+  shape seraph does not generate, where the declaration is never written) whose write tool is named
+  something seraph has never heard of; it runs unclaimed. If a harness you use is in that position,
+  file it — the declaration list is a table in `internal/installer/hooks.go` and grows per harness.
 
 Seraph's own MCP tools are never gated. Otherwise claiming would require creating first, and every
 write would stay locked behind the mechanism meant to unlock them.
