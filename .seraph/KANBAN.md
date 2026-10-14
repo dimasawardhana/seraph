@@ -2,6 +2,26 @@
 
 _Written by Seraph. Do not edit — this file is replaced on every change._
 
+## Backlog
+
+### TASK-132 · Commit the TASK-131 hook-repair work and its board records
+
+> **Goal:** The hook-repair fix in internal/installer is green and verified but sits uncommitted with its tests, so a clone gets the tree that still writes inert gates and reports them installed; land the source, the tests and the re-rendered snapshots in one commit.
+- priority: high
+- triage: ready-for-agent
+- claimed by: omp (session `01a13584-f4a2-7089-9bea-7b1325675c55`, until 2026-10-14T00:58:48Z)
+- updated: 2026-10-14T00:28:48Z
+references:
+  - internal/installer/hooks.go
+  - internal/installer/hooks_test.go
+
+> **Done when:** 1. internal/installer/hooks.go and hooks_test.go are committed, with a diff confirmed non-empty first.
+> **Done when:** 2. A clean clone of the commit builds, vets and tests green.
+> **Done when:** 3. Nothing is pushed; origin is left where it is unless the owner says otherwise.
+> **Done when:** 4. The board snapshots land so the committed board matches state.db.
+> **Done when:** 5. Done through the board with the claim held by the session that did the work.
+
+
 ## Done
 
 ### TASK-101 · Sync ROADMAP.md with shipped scope
@@ -71,14 +91,18 @@ _Written by Seraph. Do not edit — this file is replaced on every change._
 > **Goal:** The seventh Definition-of-done box requires two different harnesses coordinating on one task. The 2026-10-02 run proved the mechanics with two sessions of omp and said so (TASK-102). This task gets a second harness product genuinely into the loop on this repository, so the box is either earned or refuted by evidence rather than left unchecked.
 - priority: high
 - triage: needs-info
-- updated: 2026-10-05T04:01:39Z
+- updated: 2026-10-13T17:15:20Z
 
 > **Done when:** 1. A second harness product other than omp is registered for this repository and answers a real seraph MCP call here. [MET: kiro-cli 2.11.1, session ee6cfe57-ec4c-4638-a49b-9533d826fb42, registered seraph by importing .mcp.json at global scope and answered real claim_task and update_task calls on this board]
 > **Done when:** 2. That harness takes hold of a real task; omp is refused a claim on it and sees the holder. [MET: kiro claimed TASK-104; omp session omp-phase4-20261005T0336Z was refused CLAIM_HELD_BY_ANOTHER_SESSION with kiro's holder payload and edited no files]
 > **Done when:** 3. The second harness moves the task to done and omp sees the result on its next read. [MET: kiro set TASK-104 done at 2026-10-05T03:57:44Z; omp session omp-phase4c-20261005T0415Z then read .seraph/KANBAN.md and found TASK-104 under Done, no claimed-by line, 8 task headings under Done. A first, untargeted re-read by omp (session omp-phase4b) reported this wrongly as still mid-flight; the targeted read corrected it, and the correction is recorded rather than the first answer dropped.]
 > **Done when:** 4. Every credential-bearing config this touches is backed up first and the backup path is recorded on the board. [MET: ~/.config/opencode/opencode.json backed up to /tmp/seraph-phase4-20261005T032726Z/opencode.json.bak before opencode mcp add; ~/.omp/agent/mcp.json backed up to /tmp/seraph-phase4-20261005T032726Z/omp-mcp.json.bak before seraph was added to it]
 > **Done when:** 5. The verdict on box 7 is updated in ROADMAP.md either way. [MET: box 7 is checked and points at the new Phase 4 subsection 'Run of 2026-10-05 — two different harness products', which carries the verbatim refusal, the three answers, and the boundaries of the pass]
-> **Done when:** 6. The wired-gate half is recorded honestly. [NOT MET: seraph hook reports the Kiro gate installed, but kiro-cli 2.11.1 enforced nothing — an unclaimed write to /tmp/seraph-phase4-gate-probe.txt succeeded. Recorded as TASK-110, not fixed here.]
+> **Done when:** 6. The wired-gate half is recorded honestly. [RECONCILED 2026-10-13 under TASK-131. The original annotation read NOT MET: 'seraph hook reports the Kiro gate installed, but kiro-cli 2.11.1 enforced nothing — an unclaimed write to /tmp/seraph-phase4-gate-probe.txt succeeded.' Both halves of that are now settled, and the criterion was left unresolved on a done task until this reconciliation.
+> **Done when:**   (a) THE KIRO HALF IS RESOLVED, by TASK-110. kiro-cli 2.x turned out to have no hook surface at all, so the file could never have fired however it was shaped. Kiro is now in the Unsupported map and reports `cannot enforce` rather than `installed`; the leftover .kiro/hooks/seraph-gate.json is named inert, not deleted. Confirmed on this machine under TASK-131: `seraph hook` reads Kiro as `cannot enforce` with that reason.
+> **Done when:**   (b) THE UNDERLYING REQUIREMENT IS STILL UNMET, and saying so is the honest reading of this criterion. `seraph hook` deliberately cannot reach the word `enforcing` — no harness may read as covered without a witnessed refusal on record (TASK-113). The verified registry holds exactly one entry, omp, whose refusal was watched on 2026-10-05. Every other target reads `installed, unverified`, which is a statement about a file, not about enforcement.
+> **Done when:**   (c) THE GAP WAS WIDER THAN THIS CRITERION KNEW. TASK-131 found that the files this criterion counted as installed were not merely unverified: three of them (Codex, Copilot CLI, Gemini) named a binary that does not exist, Gemini's timeout was 10 milliseconds, and Cursor's file was written in Claude's schema into a path Cursor does not read it from. All four are fixed and now reported as `installed, command missing` where applicable. A correct file is still not a refusal observed, so (b) stands unchanged.
+> **Done when:**   (d) WHAT WOULD CLOSE IT: someone runs a real session in one of Claude Code, Cursor, Codex, Copilot CLI or Gemini CLI and watches it refuse an unclaimed write, then records the build and date in the verified registry via the format in internal/installer/hooks.go. Until that happens this criterion is a boundary, not a pass, and no further code change moves it.]
 
 > SECOND ATTEMPT 2026-10-02, via opencode. Claude Code is out of scope by the owner's decision — not installed, no credentials to be had.
 > MODEL CHANGE (done, as asked). ~/.config/opencode/opencode.json `model`: opencode/minimax-m2.1 → opencode/big-pickle. Backed up first at /tmp/opencode-config-backup-20261002T182055Z/home/dimasajiwardhana/.config/opencode/opencode.json. Rewritten through jq into the existing inode, so mode 664 and owner dimasajiwardhana are unchanged and all six top-level keys survive. `orchestrator`, the default_agent, carries no model override, so it inherits the new value — confirmed in the TUI header: 'Orchestrator · Big Pickle · OpenCode Zen'. The other six agents keep their github-copilot models, untouched.
@@ -294,6 +318,29 @@ references:
 > WHY IT MATTERED AND WAS NOT NOTICED. TASK-114 rewrote install to the ~/.omp/agent/hooks/ path, but the OLD file at <repo>/.omp/hooks/pre/seraph-gate.ts was still on disk and still loaded — so the gate kept firing and the new location's uselessness was invisible. That stale file also sent an empty session id, which is the identity bug TASK-126 fixed: the fix was written into a file omp never read.
 > THE FIX. The omp target is Project:true, Path '.omp/hooks/pre/seraph-gate.ts' — the path it had before TASK-114. Verified end to end: a fresh omp 18.0.3 headless session claimed a task under a deliberately wrong session id (the hook rewrote it to the real one), then ran a shell command while another task sat unclaimed — and was ALLOWED, creating the file. Under the old hook the same write was refused.
 > The dead gate seraph had written to ~/.omp/agent/hooks/seraph-gate.ts was removed, since a stale hook on disk is exactly what hid this defect.
+
+### TASK-131 · install writes hook commands that cannot run, reports them installed, and cannot repair them
+
+> **Goal:** For every non-omp harness, `seraph install` writes a gate file and `seraph hook` reports it installed, but the written command can name a binary that no longer exists, Gemini's timeout is 10 milliseconds, and Cursor's file is not Cursor's schema — so make install write shapes that can fire and repair a dead command, and make the health report say a dead command is dead rather than installed.
+- priority: high
+- triage: ready-for-agent
+- updated: 2026-10-13T17:16:19Z
+references:
+  - internal/installer/hooks.go
+  - internal/installer/hooks_test.go
+
+> **Done when:** 1. `seraph hook` stops reporting `installed, unverified` for a hook whose command names a binary that does not exist; the report gives the missing path. [MET: InspectHooks reads the command back out of the hook file and resolves its binary. Codex, Copilot CLI and Gemini CLI — all three carrying /tmp/binp/seraph, absent from this machine — moved from `installed, unverified` to `installed, command missing`, each naming /tmp/binp/seraph. A bare command is resolved on PATH; a path is stat'ed.]
+> **Done when:** 2. `seraph install` rewrites a hook entry whose command names a different binary than the one running, instead of reporting `unchanged`; the three `/tmp/binp/seraph` entries on this machine are repaired by a plain `seraph install`. [MET: mergeJSONHook now edits the entry install wrote — command, matcher, timeout — instead of returning early on finding one, preserving sibling hooks the user added. One `seraph install` repointed all three entries to /home/dimasajiwardhana/go/bin/seraph; a second install reported all five JSON targets `unchanged`. Configs were backed up to /tmp/seraph-131-backup-20261013T171254Z first.]
+> **Done when:** 3. The Gemini hook is written in a shape that can fire: `timeout` is milliseconds per the vendor reference, and the matcher names tools Gemini actually emits. [MET: timeout 10 -> 10000 (the field is milliseconds; 10 was ten milliseconds, below a process spawn, and Gemini treats a timeout as a warning that continues) and the matcher is write_file|replace|run_shell_command, from Gemini's own tools reference, replacing a Claude name set Gemini never emits.]
+> **Done when:** 4. The Cursor hook is written in Cursor's native schema (`version: 1`, `preToolUse`, Cursor tool names) or the Cursor target is dropped with the reason recorded. [MET, first branch: writeCursorHook writes version 1, a flat preToolUse entry, and matcher Shell|Write into .cursor/hooks.json, and deletes the Claude-shaped PreToolUse entry an earlier install left there — which Cursor reads only from .claude/settings*.json, never from its own file.]
+> **Done when:** 5. New tests pin 1-4; `gofmt -l` empty, `go vet ./...` clean, `go test ./... -count=1` green. [MET: SEVEN tests added to internal/installer/hooks_test.go (the file now holds fourteen; seven predate this task) — a missing binary reads unrunnable and is named, a bare command resolves on PATH, install repairs a stale command, repair is idempotent, the Gemini entry uses milliseconds and Gemini tool names, the Cursor entry uses Cursor's schema, and the Cursor install removes the Claude-shaped leftover. gofmt -l empty, go vet ./... clean, go test ./... -count=1 green across board, db, doctor, gate, installer, mcp, tui. Two further defects were found by these tests and fixed in the same pass — see below.]
+> **Done when:** 6. The repair is observed on this machine: `seraph install` then `seraph hook` shows the corrected command for every affected harness. [MET: rebuilt binary installed to ~/go/bin/seraph; `seraph install` run; `seraph hook` re-read with no target reporting a missing command. Codex's unrelated PostToolUse and Stop hooks and its commandWindows strings survived verbatim; Copilot's and Gemini's files kept their existing keys.]
+> **Done when:** 7. TASK-104 criterion 6, which reads `[NOT MET]` on a done task, is reconciled to what was actually established. [MET: TASK-104's criterion 6 now records that the Kiro half was resolved by TASK-110 (kiro-cli 2.x has no hook surface and is now `cannot enforce`), and that the criterion's underlying requirement — that a harness Seraph reports as gated can be shown to enforce — is still unmet for every target but omp, with what remains to close it.]
+> **Done when:** CORRECTION 2026-10-13, the same session: criterion 5 was first annotated as 'nine tests added' when seven were. Corrected against `grep -c '^func Test' internal/installer/hooks_test.go`, which reports fourteen functions, seven of which predate this task. Recorded rather than quietly edited, because a count that outran the file is the defect class this project exists to end.
+> **Done when:** TWO FURTHER DEFECTS, FOUND BY THE NEW TESTS AND FIXED HERE because the tests could not honestly pass while they stood:
+> **Done when:** (a) mentionsSeraph keyed on the literal string "seraph gate", which appears only when the binary is named seraph. Install run from a renamed or relocated binary could not recognise the entry it had just written and appended a duplicate on every pass. It now keys on the constant `gate --harness` signature every install-written entry carries. Same class TASK-108 fixed for omp, one target wider.
+> **Done when:** (b) mergeJSONHook re-marshalled the document and compared it against the file as read, but wrote the file with a trailing newline — so the comparison never matched and `unchanged` was unreachable for every JSON target. Masked until now by the early return removed by criterion 2. Both comparison sites now trim the trailing newline.
+> **Done when:** SCOPE, RECORDED RATHER THAN IMPLIED. Whether a harness actually invokes the hook it now correctly contains remains unproven for every target but omp: the `verified` registry still holds exactly one entry and nothing here changes that. A correct file is not a refusal observed — TASK-113's distinction, which still stands. Gemini's `replace` is matched alongside write_file; Cursor's timeout unit was not established from its reference, so none is written and the harness default applies.
 
 ### TASK-105 · Document seraph gate, seraph hook and seraph version in USING.md
 
