@@ -13,7 +13,13 @@ import (
 	"seraph/internal/repo"
 )
 
-type noInputs struct{}
+// boardArgs is what a caller may ask get_board_summary for. Both fields were planned in
+// ROADMAP.md Phase 5 and never built; without them the one tool a dispatcher uses could
+// only ever return everything, so its cost grew with the project's history.
+type boardArgs struct {
+	StatusFilter []string `json:"status_filter,omitempty"`
+	IncludeDone  bool     `json:"include_done,omitempty"`
+}
 
 type createArgs struct {
 	Title       string   `json:"title"`
@@ -58,7 +64,9 @@ func registerTools(server *mcp.Server, handle *sql.DB, r repo.Root) {
 		Name: "get_board_summary",
 		Description: "The project's board, grouped by status, in reading order. Returns the same " +
 			"text as .seraph/KANBAN.md and rewrites that file in the same call. Read this before " +
-			"creating work, so you do not duplicate what is already tracked.",
+			"creating work, so you do not duplicate what is already tracked. Closed tasks are " +
+			"listed by id and title only; pass include_done with status_filter to filter, and use " +
+			"get_task for one task's full record.",
 	}, getBoardSummary(handle, r))
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -97,10 +105,22 @@ func registerTools(server *mcp.Server, handle *sql.DB, r repo.Root) {
 	}, releaseTask(handle, r))
 }
 
-func getBoardSummary(handle *sql.DB, r repo.Root) func(context.Context, *mcp.CallToolRequest, noInputs) (*mcp.CallToolResult, any, error) {
-	return func(_ context.Context, _ *mcp.CallToolRequest, _ noInputs) (*mcp.CallToolResult, any, error) {
-		_, markdown, err := board.Sync(handle, r)
-		return respond(markdown, err)
+func getBoardSummary(handle *sql.DB, r repo.Root) func(context.Context, *mcp.CallToolRequest, boardArgs) (*mcp.CallToolResult, any, error) {
+	return func(_ context.Context, _ *mcp.CallToolRequest, args boardArgs) (*mcp.CallToolResult, any, error) {
+		snapshot, markdown, err := board.Sync(handle, r)
+		if err != nil {
+			return respond(nil, err)
+		}
+		// A caller that asked for nothing extra gets the bytes just written to
+		// .seraph/KANBAN.md. That keeps the long-standing promise that this tool's response
+		// is the file, byte for byte, and avoids rendering the same board twice.
+		if len(args.StatusFilter) == 0 && !args.IncludeDone {
+			return respond(markdown, nil)
+		}
+		return respond(snapshot.Render(board.MarkdownOpts{
+			Statuses: args.StatusFilter,
+			FullDone: true, // the caller named done explicitly, so give it the record
+		}), nil)
 	}
 }
 

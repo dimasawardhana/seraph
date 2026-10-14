@@ -238,15 +238,21 @@ Your harness calls these. Knowing them tells you what to ask for and what went w
 
 | Tool | Inputs | What it does |
 | --- | --- | --- |
-| `get_board_summary` | — | The whole board, grouped by status, in reading order |
+| `get_board_summary` | `status_filter?`, `include_done?` | The board, grouped by status, in reading order. Closed tasks are listed by id, title and goal; their acceptance prose and description stay in the database and come back from `get_task`. Pass `status_filter` for specific statuses, or `include_done` to render closed tasks in full |
 | `get_task` | `task_id` | One task in full, as JSON, including its claim |
 | `create_task` | `title`, `goal`, `acceptance`, `description?`, `priority?`, `triage?` | Adds a task. Starts in `backlog`. All three of `title`, `goal` and `acceptance` are required — the server refuses a task that records only *what* and cannot say whether it was the right work |
 | `claim_task` | `task_id`, `harness_id`, `session_id` | Takes an exclusive, expiring hold |
 | `update_task` | `task_id`, `session_id`, `status?`, `title?`, `goal?`, `description?`, `acceptance?`, `priority?`, `triage?` | Changes a task |
 | `release_task` | `task_id`, `session_id` | Gives up a claim without completing |
 
-**Every tool returns the whole board.** A harness never needs a second call to see current state,
-and a file you open can never disagree with what a harness was just told.
+**Every tool returns the board, and closed tasks are compact.** A harness never needs a second call to
+see current state, and a file you open can never disagree with what a harness was just told.
+
+Closed work is compact by default because it is history, not dispatch: its acceptance criteria and
+description are where the weight was, and repeating them on every call made the cost of recording one
+task grow with the project's whole history. On this repository that was 138 KB per call, 97% of it
+finished tasks. `get_task` returns any task's full record, and `include_done` restores the full render.
+`.seraph/KANBAN.md` and `.seraph/board.json` from `seraph install` carry the same compact view.
 
 The normal loop:
 

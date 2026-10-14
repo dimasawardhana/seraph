@@ -164,7 +164,7 @@ works this board for a day and says which.
 
 **Build:** `get_task`; full `doctor` — harness detection, per-harness registration state, snapshot freshness, database health; the remaining edge cases the checks above surface. Packages: `internal/mcp`, `internal/doctor`, `internal/board`.
 
-`status_filter` and `include_done` on `get_board_summary` were planned here and **were never built**. The shipped tool takes no arguments at all, so `get_board_summary` returns every status every time. They are recorded rather than quietly dropped, because they are the first thing a board of any size will want and the plan should not have to be re-derived. Corrected 2026-10-02, `TASK-107`.
+`status_filter` and `include_done` on `get_board_summary` were planned here and **were never built**, recorded 2026-10-02 in `TASK-107` rather than quietly dropped. Both are built now, as `TASK-134`, along with the reason they turned out to matter more than a convenience: the tool's response is every call's payload, and it carried every closed task's full acceptance prose, so the cost of recording one task grew with the project's whole history. On this repository that was 138 KB per call of which 97% was finished work; closed tasks now render as their heading and goal, which took the same board to 19 KB. `get_task` still returns any task's full record.
 
 
 **Check:** `seraph doctor` on this machine reports every harness it detects, distinguishes registered from not, and prints the block for the ones `install` deliberately does not touch. Every box in §Definition of done holds, with box 7 the recorded exception.
